@@ -48,8 +48,6 @@ class Encoder(torch.nn.Module):
 
    
 class Model(torch.nn.Module):
-  """CoverHunter
-  """
   def __init__(self, input_dim: int = INPUT_DIM, embed_dim: int = EMBED_DIM, 
                output_dim: int = OUTPUT_DIM, attention_dim: int = ATTENTION_DIM,
                num_blocks: int = NUM_BLOCKS,  output_cls: int = OUTPUT_CES):

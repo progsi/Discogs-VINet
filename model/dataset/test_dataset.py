@@ -92,7 +92,8 @@ class TestDataset(Dataset):
                 delete = []
                 for i in range(len(self.cliques[clique_id])):
                     yt_id = self.cliques[clique_id][i]["youtube_id"]
-                    if not (self.features_dir / yt_id[:2] / f"{yt_id}.mm").exists():
+                    # any type of file is allowed
+                    if not any((self.features_dir / yt_id[:2]).glob(f"{yt_id}.*")):
                         delete.append(i)
                 for i in reversed(delete):
                     del self.cliques[clique_id][i]

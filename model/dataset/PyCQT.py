@@ -1,8 +1,9 @@
+# Based on: https://github.com/zafarrafii/Zaf-Python/blob/master/zaf.py
 import numpy as np
 import scipy
 
 def compute_kernel(sf: int, octave_res: int, fmin: int, fmax: int) -> np.array:
-    """_summary_
+    """Compute the kernel.
     Args:
         sf (int): sampling frequency in in Hz
         octave_res (int): octave resolution
@@ -52,7 +53,7 @@ def compute_spectogram(y: np.array, sf: int, time_res: int, cqt_kernel: np.array
 
 def compute_cqt(y: np.array, sr: int, hop_size: int, 
                 octave_res: int = 12, fmin: int = 32, fmax: int = None) -> np.array:
-    """Based on: https://github.com/zafarrafii/Zaf-Python/blob/master/zaf.py
+    """Compute the CQT feature for an audio signal.
     Args:
         y (np.array): signal
         sr (int): sampling rate

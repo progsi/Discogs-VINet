@@ -5,6 +5,7 @@ import yaml
 import torch
 
 from model.nets import CQTNet
+from model.nets.coverhunter.model import Model as CoverHunter
 from model.lr_schedulers import (
     CosineAnnealingWarmupRestarts,
     WarmupPiecewiseConstantScheduler,
@@ -35,8 +36,16 @@ def build_model(config: dict, device: str) -> CQTNet:
             pool=config["MODEL"]["POOLING"],
             l2_normalize=config["MODEL"]["L2_NORMALIZE"],
             projection=config["MODEL"]["PROJECTION"],
-        )
-        model.to(device)
+        ).to(device)
+    elif config["MODEL"]["ARCHITECTURE"].upper() == "COVERHUNTER":
+        model = CoverHunter(
+            input_dim=config["MODEL"]["FREQUENCY_BINS"],
+            embed_dim=config["MODEL"]["EMBEDDING_SIZE"],
+            output_dim=config["MODEL"]["EMBEDDING_SIZE"],
+            # attention_dim=config["MODEL"]["ATTENTION_DIM"],
+            # num_blocks=config["MODEL"]["NUM_BLOCKS"],
+            output_cls=config["MODEL"]["OUTPUT_CES"],
+        ).to(device)
     else:
         raise ValueError("Model architecture not recognized.")
     _, _ = count_model_parameters(model)
