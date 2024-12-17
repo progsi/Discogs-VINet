@@ -20,7 +20,7 @@ MODEL :
 
 TRAIN:
     # Train and Validation, and Augmentation directories
-    FEATURES_DIR: /data/audio/mp4/
+    FEATURES_DIR: /data/audio/cqt/
     TRAIN_CLIQUES: /data/discogs/Discogs-VI-YT-20240701-light.json.train
     VALIDATION_CLIQUES: /data/discogs/Discogs-VI-YT-20240701-light.json.val
     VERSIONS_PER_CLIQUE: 4 # Number of versions per clique during a training iteration.

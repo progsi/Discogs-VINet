@@ -8,7 +8,6 @@ import torch
 from torch.utils.data import Dataset
 
 from .dataset_utils import mean_downsample_cqt
-from ...utilities.extract_cqt import process_audio
 
 class TrainDataset(Dataset):
     """Training dataset.
