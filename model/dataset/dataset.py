@@ -7,56 +7,6 @@ from torch.utils.data import Dataset
 class BaseDataset(Dataset):
     """BaseDataset with elementary functions.
     """
-
-    def __init__(
-        self,
-        cliques_json_path: str,
-        features_dir: str,
-        mean_downsample_factor: int = 20,
-        cqt_bins: int = 84,
-        scale: bool = True,
-    ) -> None:
-        """Initializes the dataset
-
-        Parameters:
-        -----------
-        cliques_json_path : str
-            Path to the cliques json file
-        features_dir : str
-            Path to the directory containing the features
-        mean_downsample_factor : int
-            Factor by which to downsample the features by taking the mean
-        cqt_bins : int
-            Number of CQT bins in a feature array
-        scale : bool
-            Whether to scale the features to [0,1]
-        """
-
-        assert cqt_bins > 0, f"Expected cqt_bins > 0, got {cqt_bins}"
-        assert (
-            mean_downsample_factor > 0
-        ), f"Expected mean_downsample_factor > 0, got {mean_downsample_factor}"
-
-        self.cliques_json_path = cliques_json_path
-        self.features_dir = pathlib.Path(features_dir)
-        self.mean_downsample_factor = mean_downsample_factor
-        self.scale = scale
-        self.cqt_bins = cqt_bins
-
-        # Load the cliques
-        print(f"Loading cliques from {cliques_json_path}")
-        with open(cliques_json_path) as f:
-            self.cliques = json.load(f)
-
-        # Count the number of cliques and versions
-        self.n_cliques, self.n_versions = 0, 0
-        for versions in self.cliques.values():
-            self.n_cliques += 1
-            self.n_versions += len(versions)
-        print(f"{self.n_cliques:>7,} cliques found.")
-        print(f"{self.n_versions:>7,} versions found.")
-
-
     def _delete_missing_features(self):
         """Deletes versions with missing features and afterwards,
         cliques with less than 2 versions.
