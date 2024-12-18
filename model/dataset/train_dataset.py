@@ -3,13 +3,12 @@ import pathlib
 from typing import Tuple
 
 import numpy as np
-
 import torch
-from torch.utils.data import Dataset
 
+from .dataset import BaseDataset
 from .dataset_utils import mean_downsample_cqt
 
-class TrainDataset(Dataset):
+class TrainDataset(BaseDataset):
     """Training dataset.
 
     It samples random anchor and positive versions from the same clique.
@@ -85,18 +84,7 @@ class TrainDataset(Dataset):
 
         # Delete versions with missing features # TODO: slow
         print("Deleting versions with missing features...")
-        for clique_id in list(self.cliques.keys()):
-            delete = []
-            for i in range(len(self.cliques[clique_id])):
-                yt_id = self.cliques[clique_id][i]["youtube_id"]
-                # any type of file is allowed
-                if not any((self.features_dir / yt_id[:2]).glob(f"{yt_id}.*")):
-                    delete.append(i)
-            for i in reversed(delete):
-                del self.cliques[clique_id][i]
-            # If a clique is left with less than 2 versions, delete the clique
-            if len(self.cliques[clique_id]) < 2:
-                del self.cliques[clique_id]
+        self._delete_missing_features()
 
         self.clique_ids = list(self.cliques.keys())
 
@@ -118,7 +106,7 @@ class TrainDataset(Dataset):
             versions = self.cliques[clique_id]
             for i in range(len(versions)):
                 self.indices.append((clique_id, i))
-
+     
     def __getitem__(self, index, encode_version=False) -> Tuple[torch.Tensor, list]:
         """Get self.samples_per_clique random anchor versions from a given clique.
 
