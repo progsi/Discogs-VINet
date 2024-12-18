@@ -38,7 +38,8 @@ class Encoder(torch.nn.Module):
     return
 
   def forward(self, x: torch.Tensor) -> torch.Tensor:
-    x = self.global_cmvn(x.transpose(1, 2)).transpose(1, 2)
+    x = x.squeeze()
+    x = self.global_cmvn(x).transpose(1, 2)
     xs_lens = torch.full(
       [x.size(0)], 
       fill_value=x.size(1), 

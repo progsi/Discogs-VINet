@@ -6,6 +6,7 @@ import time
 import yaml
 import argparse
 from typing import Tuple, Union
+from tqdm import tqdm
 
 import numpy as np
 
@@ -40,7 +41,7 @@ def train_epoch(
 
     model.train()
     losses, triplet_stats = [], []
-    for i, (anchors, labels) in enumerate(loader):
+    for i, (anchors, labels) in enumerate(tqdm(loader)):
         anchors = anchors.unsqueeze(1).to(device)  # (B,F,T) -> (B,1,F,T)
         labels = labels.to(device)  # (B,)
         optimizer.zero_grad()  # TODO set_to_none=True?

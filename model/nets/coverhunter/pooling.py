@@ -60,13 +60,13 @@ class AttentiveStatisticsPooling(torch.nn.Module):
     mean = mean.unsqueeze(2).repeat(1, 1, L)
     std = std.unsqueeze(2).repeat(1, 1, L)
     attn = torch.cat([x, mean, std], dim=1)
-    attn = self._conv(self._tanh(self._linear(
+    attn = self.conv(self.tanh(self.linear(
       attn.transpose(1, 2)).transpose(1, 2)))
 
     attn = attn.masked_fill(mask == 0, float("-inf"))  # Filter out zero-padding
     attn = F.softmax(attn, dim=2)
     mean, std = self._compute_statistics(x, attn, self.eps)
-    pooled_stats = self._final_layer(torch.cat((mean, std), dim=1))
+    pooled_stats = self.final_layer(torch.cat((mean, std), dim=1))
     return pooled_stats
 
   def forward_with_mask(self, x: torch.Tensor,

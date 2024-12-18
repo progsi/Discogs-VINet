@@ -1,5 +1,5 @@
 MODEL :
-  NAME: Discogs-VINet-MIREX-only_train
+  NAME: berlin
   # Model
   ARCHITECTURE: coverhunter
   EMBEDDING_SIZE: 512
