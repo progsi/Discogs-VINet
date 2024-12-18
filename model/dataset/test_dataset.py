@@ -86,7 +86,7 @@ class TestDataset(BaseDataset):
 
         # In datacos all features are present so no need to filter
         if self.discogs_vi or self.shs100k:
-            # Delete versions with missing features # TODO: slow
+            # Delete versions with missing features 
             print("Deleting versions with missing features...")
             self._delete_missing_features()
 

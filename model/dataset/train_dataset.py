@@ -82,7 +82,7 @@ class TrainDataset(BaseDataset):
         print(f"{self.n_cliques:>7,} cliques found.")
         print(f"{self.n_versions:>7,} versions found.")
 
-        # Delete versions with missing features # TODO: slow
+        # Delete versions with missing features
         print("Deleting versions with missing features...")
         self._delete_missing_features()
 
