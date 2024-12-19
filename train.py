@@ -12,13 +12,13 @@ import numpy as np
 
 import torch
 from torch.utils.data import DataLoader
-
-torch.multiprocessing.set_sharing_strategy("file_system")
+from pytorch_metric_learning import losses
+from pytorch_metric_learning.samplers import MPerClassSampler
+# TODO import triplet miner
 
 from evaluate import evaluate
 from model.nets import CQTNet
 from model.dataset import TrainDataset, TestDataset
-from model.loss import triplet_loss
 from model.utils import load_model, save_model
 from utilities.utils import format_time
 
@@ -41,13 +41,14 @@ def train_epoch(
 
     model.train()
     losses, triplet_stats = [], []
-    for i, (anchors, labels) in enumerate(tqdm(loader)):
-        anchors = anchors.unsqueeze(1).to(device)  # (B,F,T) -> (B,1,F,T)
+    for i, (features, labels) in enumerate(tqdm(loader)):
+        features = features.unsqueeze(1).to(device)  # (B,F,T) -> (B,1,F,T)
         labels = labels.to(device)  # (B,)
         optimizer.zero_grad()  # TODO set_to_none=True?
         with torch.autocast(device_type=device.type, dtype=torch.float16, enabled=amp):
-            embeddings = model(anchors)
-            loss, stats = triplet_loss(embeddings, labels, **loss_config)
+            embeddings = model(features)
+            # TODO: implement loss function
+            loss, stats = None, None
         if amp:
             scaler.scale(loss).backward()  # type: ignore
             scaler.step(optimizer)
@@ -174,9 +175,12 @@ if __name__ == "__main__":
         config["TRAIN"]["FEATURES_DIR"],
         context_length=config["TRAIN"]["CONTEXT_LENGTH"],
         mean_downsample_factor=config["MODEL"]["DOWNSAMPLE_FACTOR"],
-        versions_per_clique=config["TRAIN"]["VERSIONS_PER_CLIQUE"],
         clique_usage_ratio=config["TRAIN"]["CLIQUE_USAGE_RATIO"],
     )
+    
+    # TODO: implement MPerClassSampler
+    sampler = MPerClassSampler(train_dataset.labels, m=config["TRAIN"]["M_PER_CLASS"])
+
     train_loader = DataLoader(
         train_dataset,
         batch_size=config["TRAIN"]["BATCH_SIZE"],
@@ -202,6 +206,9 @@ if __name__ == "__main__":
 
     loss_config = {k.lower(): v for k, v in config["TRAIN"]["LOSS"].items()}
 
+    triplet_loss = losses.TripletMarginLoss(margin=loss_config["margin"])
+    
+    
     # Log the initial lr
     if not args.no_wandb:
         if scheduler is not None:
