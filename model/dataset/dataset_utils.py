@@ -14,13 +14,11 @@ def mean_downsample_cqt(cqt: np.ndarray, mean_window_length: int) -> np.ndarray:
     --------
         new_cqt: np.ndarray, shape=(T//mean_window_length,F), downsampled CQT
     """
-
+    # get dimensions and get new T
     cqt_T, cqt_F = cqt.shape
-    # Discard the last frame
-    new_T = int(cqt_T // mean_window_length)
-    new_cqt = np.zeros((new_T, cqt_F), dtype=cqt.dtype)
-    for i in range(new_T):
-        new_cqt[i, :] = cqt[
-            i * mean_window_length : (i + 1) * mean_window_length, :
-        ].mean(axis=0)
+    new_T = cqt_T // mean_window_length
+    
+    # downsample
+    reshaped_cqt = cqt[:new_T * mean_window_length].reshape(new_T, mean_window_length, cqt_F)
+    new_cqt = reshaped_cqt.mean(axis=1)
     return new_cqt

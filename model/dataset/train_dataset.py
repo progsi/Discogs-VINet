@@ -218,7 +218,7 @@ class TrainDataset(BaseDataset):
         # And the shape as a separate numpy array
         feature_shape_path = feature_dir / f"{yt_id}.npy"
         # Load the memmap shape
-        feature_shape = tuple(np.load(feature_shape_path))
+        feature_shape = tuple(np.load(feature_shape_path, mmap_mode="r"))
 
         # Load the magnitude CQT
         if feature_shape[0] > self.context_length:
