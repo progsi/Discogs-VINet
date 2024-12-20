@@ -5,7 +5,7 @@ from datetime import datetime
 import time
 import yaml
 import argparse
-from typing import Tuple, Union
+from typing import Tuple, Union, Type
 from tqdm import tqdm
 
 import numpy as np
@@ -18,7 +18,7 @@ from evaluate import evaluate
 from src.dataset import TrainDataset, TestDataset
 from src.utils import load_model, save_model
 from src.utilities.utils import format_time
-
+from src.losses import init_loss
 
 SEED = 27  # License plate code of Gaziantep, gastronomical capital of Türkiye
 
@@ -26,8 +26,7 @@ SEED = 27  # License plate code of Gaziantep, gastronomical capital of Türkiye
 def train_epoch(
     model: torch.nn.Module,
     loader: DataLoader,
-    loss_func: losses.TripletMarginLoss,
-    miner: miners.TripletMarginMiner,
+    loss_func: Union[Type[torch.nn.Module]],
     optimizer: torch.optim.Optimizer,
     scheduler: Union[torch.optim.lr_scheduler.LRScheduler, None],
     scaler: Union[torch.cuda.amp.GradScaler, None],  # type: ignore
@@ -45,9 +44,7 @@ def train_epoch(
         optimizer.zero_grad()  # TODO set_to_none=True?
         with torch.autocast(device_type=device.type, dtype=torch.float16, enabled=amp):
             embeddings = model(features)
-            # TODO: implement loss function
-            hard_pairs = miner(embeddings, labels)
-            loss = loss_func(embeddings, labels, hard_pairs)
+            loss = loss_func(embeddings, labels)
         if amp:
             scaler.scale(loss).backward()  # type: ignore
             scaler.step(optimizer)
@@ -203,11 +200,8 @@ if __name__ == "__main__":
         num_workers=args.num_workers,
     )
 
+    loss_func = init_loss(config["TRAIN"]["LOSS"])
     # init the triplet loss and mining
-    loss_config = {k.lower(): v for k, v in config["TRAIN"]["LOSS"].items()}
-    triplet_loss = losses.TripletMarginLoss(margin=loss_config["margin"])
-    miner = miners.TripletMarginMiner(margin=loss_config["margin"], 
-                                      type_of_triplets=loss_config["triplet_mining"])
     
     # Log the initial lr
     if not args.no_wandb:
@@ -230,8 +224,7 @@ if __name__ == "__main__":
         train_loss, lr_current, triplet_stats = train_epoch(
             model,
             train_loader,
-            triplet_loss,
-            miner,
+            loss_func,
             optimizer,
             scheduler,
             scaler=scaler,

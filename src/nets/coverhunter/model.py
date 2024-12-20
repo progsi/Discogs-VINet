@@ -68,18 +68,15 @@ class Model(torch.nn.Module):
     self.ce_layer = torch.nn.Linear(
       self.embed_dim, self.output_cls, bias=False)
 
-    return
-
   def forward(self, x: torch.Tensor) -> torch.Tensor:
     x = self.encoder(x)
     x = self.pool_layer(x)
     return x
 
-  @torch.jit.ignore
-  def inference(self, feat: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+  def forward_ce(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
     with torch.no_grad():
-      embed = self.forward(feat)
-      embed_ce = self.ce_layer(embed)
-    return embed, embed_ce
+      x = self.forward(x) # compute embedding
+      y = self.ce_layer(x) # compute class
+    return x, y
 
 
