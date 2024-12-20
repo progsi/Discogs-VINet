@@ -4,9 +4,9 @@ from typing import Tuple
 import yaml
 import torch
 
-from model.nets.cqtnet import CQTNet
-from model.nets.coverhunter import Model as CoverHunter
-from model.lr_schedulers import (
+from src.nets.cqtnet import CQTNet
+from src.nets.coverhunter import Model as CoverHunter
+from src.lr_schedulers import (
     CosineAnnealingWarmupRestarts,
     WarmupPiecewiseConstantScheduler,
 )

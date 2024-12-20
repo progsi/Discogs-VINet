@@ -1,8 +1,8 @@
 from typing import Tuple
 import torch
 
-from model.nets.coverhunter.conformer import ConformerEncoder
-from model.nets.coverhunter.pooling import AttentiveStatisticsPooling
+from src.nets.coverhunter.conformer import ConformerEncoder
+from src.nets.coverhunter.pooling import AttentiveStatisticsPooling
 
 # CoverHunter parameters
 INPUT_DIM = 84 # instead of 96 in CoverHunter paper

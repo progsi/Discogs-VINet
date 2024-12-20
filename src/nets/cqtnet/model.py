@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from utilities.tensor_op import l2_normalize
+from src.utilities.tensor_op import l2_normalize
 
 from .aux import IBN, GeM, Linear, SoftPool
 

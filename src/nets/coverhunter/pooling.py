@@ -2,7 +2,7 @@ import torch
 import torch.nn.functional as F
 from typing import Optional
 import logging
-from model.nets.coverhunter.layers import Conv1d, Linear
+from src.nets.coverhunter.layers import Conv1d, Linear
 
 
 class AttentiveStatisticsPooling(torch.nn.Module):

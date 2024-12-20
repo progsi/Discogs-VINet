@@ -29,11 +29,11 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from model.nets import CQTNet
-from model.dataset import InferenceDataset
-from model.utils import load_model
-from utilities.utils import format_time
-from utilities.tensor_op import pairwise_distance_matrix
+from src.nets import CQTNet
+from src.dataset import InferenceDataset
+from src.utils import load_model
+from src.utilities.utils import format_time
+from src.utilities.tensor_op import pairwise_distance_matrix
 
 
 @torch.no_grad()

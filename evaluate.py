@@ -7,10 +7,10 @@ import argparse
 import torch
 from torch.utils.data import DataLoader
 
-from model.dataset import TestDataset
-from model.utils import load_model
-from utilities.utils import format_time
-from utilities.metrics import calculate_metrics
+from src.dataset import TestDataset
+from src.utils import load_model
+from src.utilities.utils import format_time
+from src.utilities.metrics import calculate_metrics
 
 # My linux is complaining without the following line
 # It required for the DataLoader to have the num_workers > 0
