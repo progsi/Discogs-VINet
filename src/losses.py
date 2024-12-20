@@ -60,9 +60,16 @@ class TripletMarginLoss(losses.TripletMarginLoss):
         self.mining = mining
         self.miner = miners.TripletMarginMiner(margin=self.margin, type_of_triplets=self.mining)
         
-    def __call__(self, embeddings: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
-        hard_pairs = self.miner(embeddings, labels)
-        loss = super(embeddings, labels, hard_pairs)
+    def __call__(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        """Calculate loss.
+        Args:
+            x (torch.Tensor): embeddings
+            y (torch.Tensor): class labels
+        Returns:
+            torch.Tensor: loss
+        """
+        hard_pairs = self.miner(x, y)
+        loss = super(x, y, hard_pairs)
         return loss
         
 class CenterLoss(nn.Module):
@@ -74,30 +81,32 @@ class CenterLoss(nn.Module):
     """
     def __init__(self, num_classes: int = 10, feat_dim: int = 2, device: str = 'cuda'):
         super(CenterLoss, self).__init__()
-        self.num_classes = num_classes
+        self.num_classes = num_classes 
         self.feat_dim = feat_dim
         self.device = device
 
         self.centers = nn.Parameter(torch.randn(self.num_classes, self.feat_dim).to(self.device))
 
 
-    def forward(self, x, labels):
-        """
+    def forward(self, x: torch.tensor, y: torch.tensor) -> torch.tensor:
+        """Compute loss.
         Args:
-            x: feature matrix with shape (batch_size, feat_dim).
-            labels: ground truth labels with shape (batch_size).
+            x (torch.tensor): embeddings
+            y (torch.tensor): class labels
+        Returns:
+            torch.tensor: loss
         """
-        batch_size = x.size(0)
-        distmat = torch.pow(x, 2).sum(dim=1, keepdim=True).expand(batch_size, self.num_classes) + \
-                  torch.pow(self.centers, 2).sum(dim=1, keepdim=True).expand(self.num_classes, batch_size).t()
+        N = x.size(0)
+        distmat = torch.pow(x, 2).sum(dim=1, keepdim=True).expand(N, self.num_classes) + \
+                  torch.pow(self.centers, 2).sum(dim=1, keepdim=True).expand(self.num_classes, N).t()
         distmat.addmm_(1, -2, x, self.centers.t())
 
         classes = torch.arange(self.num_classes).long().to(self.device)
-        labels = labels.unsqueeze(1).expand(batch_size, self.num_classes)
-        mask = labels.eq(classes.expand(batch_size, self.num_classes))
+        y = y.unsqueeze(1).expand(N, self.num_classes)
+        mask = y.eq(classes.expand(N, self.num_classes))
 
         dist = distmat * mask.float()
-        loss = dist.clamp(min=1e-12, max=1e+12).sum() / batch_size
+        loss = dist.clamp(min=1e-12, max=1e+12).sum() / B
 
         return loss
     
@@ -137,21 +146,21 @@ class FocalLoss(nn.Module):
         self.eps = eps
         self.weights = weights
 
-    def _get_weights(self, target: Tensor) -> Tensor:
+    def _get_weights(self, y: Tensor) -> Tensor:
         if self.weights is None:
-            return torch.ones(target.shape[0])
-        weights = target * self.weights
+            return torch.ones(y.shape[0])
+        weights = y * self.weights
         return weights.sum(dim=-1)
 
     def _process_target(
-            self, target: Tensor, num_classes: int
+            self, y: Tensor, num_classes: int
             ) -> Tensor:
         
         #convert all ignore_index elements to zero to avoid error in one_hot
         #note - the choice of value 0 is arbitrary, but it should not matter as these elements will be ignored in the loss calculation
-        target = target * (target!=self.ignore_index) 
-        target = target.view(-1)
-        return one_hot(target, num_classes=num_classes)
+        y = y * (y != self.ignore_index) 
+        y = y.view(-1)
+        return one_hot(y, num_classes=num_classes)
 
     def _process_preds(self, x: Tensor) -> Tensor:
         if x.dim() == 1:
@@ -161,26 +170,33 @@ class FocalLoss(nn.Module):
         return x.view(-1, x.shape[-1])
 
     def _calc_pt(
-            self, target: Tensor, x: Tensor, mask: Tensor
+            self, y: Tensor, x: Tensor, mask: Tensor
             ) -> Tensor:
-        p = target * x
+        p = y * x
         p = p.sum(dim=-1)
         p = p * ~mask
         return p
 
-    def forward(self, x: Tensor, target: Tensor) -> Tensor:
+    def forward(self, x: torch.tensor, y: torch.tensor) -> torch.tensor:
+        """Compute loss.
+        Args:
+            x (torch.tensor): embeddings
+            y (torch.tensor): class labels
+        Returns:
+            torch.tensor: loss
+        """
         assert torch.all((x >= 0.0) & (x <= 1.0)), ValueError(
             'The predictions values should be between 0 and 1, \
                 make sure to pass the values to sigmoid for binary \
                 classification or softmax for multi-class classification'
         )
-        mask = target == self.ignore_index
+        mask = y == self.ignore_index
         mask = mask.view(-1)
         x = self._process_preds(x)
         num_classes = x.shape[-1]
-        target = self._process_target(target, num_classes, mask)
-        weights = self._get_weights(target).to(x.device)
-        pt = self._calc_pt(target, x, mask)
+        y = self._process_target(y, num_classes, mask)
+        weights = self._get_weights(y).to(x.device)
+        pt = self._calc_pt(y, x, mask)
         focal = 1 - pt
         nll = -torch.log(self.eps + pt)
         nll = nll.masked_fill(mask, 0)
