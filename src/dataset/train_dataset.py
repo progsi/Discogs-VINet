@@ -68,6 +68,12 @@ class TrainDataset(BaseDataset):
         print(f"Loading cliques from {cliques_json_path}")
         with open(cliques_json_path) as f:
             self.cliques = json.load(f)
+            
+        # Use a subset of cliques based on the clique_usage_ratio
+        if clique_usage_ratio < 1.0:
+            N = int(len(self.cliques) * clique_usage_ratio)
+            sampled_ids = np.random.choice(list(self.cliques.keys()), N, replace=False)
+            self.cliques = {clique_id: self.cliques[clique_id] for clique_id in sampled_ids}
 
         # Count the number of cliques and versions
         self.n_cliques, self.n_versions = 0, 0

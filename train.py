@@ -197,7 +197,7 @@ if __name__ == "__main__":
     )
     eval_loader = DataLoader(
         eval_dataset,
-        batch_size=1,
+        batch_size=1, # TODO: large batch size + padding?
         shuffle=False,
         drop_last=False,
         num_workers=args.num_workers,
