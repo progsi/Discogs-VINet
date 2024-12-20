@@ -15,7 +15,6 @@ from torch.utils.data import DataLoader
 from pytorch_metric_learning import miners, losses, samplers
 
 from evaluate import evaluate
-from model.nets import CQTNet
 from model.dataset import TrainDataset, TestDataset
 from model.utils import load_model, save_model
 from utilities.utils import format_time
@@ -25,9 +24,10 @@ SEED = 27  # License plate code of Gaziantep, gastronomical capital of Türkiye
 
 
 def train_epoch(
-    model: CQTNet,
+    model: torch.nn.Module,
     loader: DataLoader,
     loss_func: losses.TripletMarginLoss,
+    miner: miners.TripletMarginMiner,
     optimizer: torch.optim.Optimizer,
     scheduler: Union[torch.optim.lr_scheduler.LRScheduler, None],
     scaler: Union[torch.cuda.amp.GradScaler, None],  # type: ignore
@@ -231,6 +231,7 @@ if __name__ == "__main__":
             model,
             train_loader,
             triplet_loss,
+            miner,
             optimizer,
             scheduler,
             scaler=scaler,

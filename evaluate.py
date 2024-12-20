@@ -7,7 +7,6 @@ import argparse
 import torch
 from torch.utils.data import DataLoader
 
-from model.nets import CQTNet
 from model.dataset import TestDataset
 from model.utils import load_model
 from utilities.utils import format_time
@@ -20,7 +19,7 @@ torch.multiprocessing.set_sharing_strategy("file_system")
 
 @torch.no_grad()
 def evaluate(
-    model: CQTNet,
+    model: torch.nn.Module,
     loader: DataLoader,
     similarity_search: str,
     chunk_size: int,
@@ -36,7 +35,7 @@ def evaluate(
 
     Parameters:
     -----------
-    model : CQTNet
+    model : torch.nn.Module
         Model to evaluate
     loader : torch.utils.data.DataLoader
         DataLoader containing the test set cliques

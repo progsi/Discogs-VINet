@@ -128,7 +128,7 @@ class TrainDataset(BaseDataset):
     def __len__(self) -> int:
         """Each version appears once at each epoch."""
 
-        return len(self.indices)
+        return len(self.labels)
 
     def load_cqt(self, yt_id) -> torch.Tensor:
         """Load the magnitude CQT features for a single version with yt_id from the features
