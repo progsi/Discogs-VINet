@@ -29,10 +29,18 @@ TRAIN:
     EPOCHS: 40 # Number of epochs to train.
     LOSS:
       TRIPLET:
+        WEIGHT: 0.1 # Weight of the loss.
         MARGIN: 0.3 # Triplet loss margin
         MINING: semihard # key from pytorch-metric-learning
         SQUARED_DISTANCE: False # Use squared distance in the loss.
         NON_ZERO_MEAN: True # If true, the zero losses in the batch are filtered out before averaging.
+      CENTER:
+        WEIGHT: 0.01 # Weight of the loss.
+        NUM_CLS: 80_017 # Number of classes.
+        FEAT_DIM: 512 # Embedding dimension
+      FOCAL:
+        WEIGHT: 1.0 # Weight of the loss.
+        GAMMA: 2.0 # Focal loss gamma.
     OPTIMIZER: Adam # ['Adam', 'AdamW']
     AUTOMATIC_MIXED_PRECISION: True # Use mixed precision training.
     LR:

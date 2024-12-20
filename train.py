@@ -12,21 +12,21 @@ import numpy as np
 
 import torch
 from torch.utils.data import DataLoader
-from pytorch_metric_learning import miners, losses, samplers
+from pytorch_metric_learning import miners, samplers
 
 from evaluate import evaluate
 from src.dataset import TrainDataset, TestDataset
 from src.utils import load_model, save_model
 from src.utilities.utils import format_time
-from src.losses import init_loss
+from src.losses import init_loss, WeightedMultiloss, FocalLoss
 
 SEED = 27  # License plate code of Gaziantep, gastronomical capital of Türkiye
 
 
 def train_epoch(
-    model: torch.nn.Module,
+    model: Type[torch.nn.Module],
     loader: DataLoader,
-    loss_func: Union[Type[torch.nn.Module]],
+    loss_func: Type[torch.nn.Module],
     optimizer: torch.optim.Optimizer,
     scheduler: Union[torch.optim.lr_scheduler.LRScheduler, None],
     scaler: Union[torch.cuda.amp.GradScaler, None],  # type: ignore
@@ -35,6 +35,7 @@ def train_epoch(
     """Train the model for one epoch. Return the average loss of the epoch."""
 
     amp = scaler is not None
+    cls = isinstance(loss_func, WeightedMultiloss) or isinstance(loss_func, FocalLoss) or isinstance(loss_func, torch.nn.CrossEntropyLoss)
 
     model.train()
     losses, triplet_stats = [], []
@@ -43,8 +44,14 @@ def train_epoch(
         labels = labels.to(device)  # (B,)
         optimizer.zero_grad()  # TODO set_to_none=True?
         with torch.autocast(device_type=device.type, dtype=torch.float16, enabled=amp):
-            embeddings = model(features)
-            loss = loss_func(embeddings, labels)
+            if cls:
+                # TODO: can I make this prettier?
+                embeddings, y = model.forward_cls(features)
+                # TODO: fix this, loss dim. is not correct
+                loss = loss_func(embeddings, labels, y, labels)
+            else:
+                embeddings = model(features)
+                loss = loss_func(embeddings, labels)
         if amp:
             scaler.scale(loss).backward()  # type: ignore
             scaler.step(optimizer)

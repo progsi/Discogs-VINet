@@ -3,6 +3,7 @@ import csv
 import time
 import yaml
 import argparse
+from typing import Type
 
 import torch
 from torch.utils.data import DataLoader
@@ -12,14 +13,10 @@ from src.utils import load_model
 from src.utilities.utils import format_time
 from src.utilities.metrics import calculate_metrics
 
-# My linux is complaining without the following line
-# It required for the DataLoader to have the num_workers > 0
-torch.multiprocessing.set_sharing_strategy("file_system")
-
 
 @torch.no_grad()
 def evaluate(
-    model: torch.nn.Module,
+    model: Type[torch.nn.Module],
     loader: DataLoader,
     similarity_search: str,
     chunk_size: int,

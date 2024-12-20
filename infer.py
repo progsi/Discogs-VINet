@@ -22,14 +22,13 @@ import csv
 import time
 import yaml
 import argparse
-from typing import Tuple
+from typing import Tuple, Type
 
 import numpy as np
 
 import torch
 from torch.utils.data import DataLoader
 
-from src.nets import CQTNet
 from src.dataset import InferenceDataset
 from src.utils import load_model
 from src.utilities.utils import format_time
@@ -38,7 +37,7 @@ from src.utilities.tensor_op import pairwise_distance_matrix
 
 @torch.no_grad()
 def infer(
-    model: CQTNet,
+    model: Type[torch.nn.Module],
     loader: DataLoader,
     query_list: list[str],
     amp: bool,

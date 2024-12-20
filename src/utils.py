@@ -44,7 +44,7 @@ def build_model(config: dict, device: str) -> CQTNet:
             output_dim=config["MODEL"]["EMBEDDING_SIZE"],
             # attention_dim=config["MODEL"]["ATTENTION_DIM"],
             # num_blocks=config["MODEL"]["NUM_BLOCKS"],
-            output_cls=config["MODEL"]["OUTPUT_CES"],
+            output_cls=config["MODEL"]["OUTPUT_CLS"],
         ).to(device)
     else:
         raise ValueError("Model architecture not recognized.")

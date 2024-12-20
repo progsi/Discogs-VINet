@@ -13,8 +13,8 @@ ATTENTION_DIM = 256
 NUM_BLOCKS = 6
 OUTPUT_DIM = 128
 
-# Bottleneck
-OUTPUT_CES = 30_000
+# Classes
+OUTPUT_CLS = 30_000 # default from CoverHunter
 
 class Encoder(torch.nn.Module):
   """Encoding part of CoverHunter, returning a variable length processed CQT feature.
@@ -51,7 +51,7 @@ class Encoder(torch.nn.Module):
 class Model(torch.nn.Module):
   def __init__(self, input_dim: int = INPUT_DIM, embed_dim: int = EMBED_DIM, 
                output_dim: int = OUTPUT_DIM, attention_dim: int = ATTENTION_DIM,
-               num_blocks: int = NUM_BLOCKS,  output_cls: int = OUTPUT_CES):
+               num_blocks: int = NUM_BLOCKS,  output_cls: int = OUTPUT_CLS):
     super(Model, self).__init__()
     self.input_dim = input_dim
     self.embed_dim = embed_dim
@@ -65,7 +65,11 @@ class Model(torch.nn.Module):
 
     self.pool_layer = AttentiveStatisticsPooling(
       self.embed_dim, output_channels=self.embed_dim)
-    self.ce_layer = torch.nn.Linear(
+    
+    self.bottleneck = torch.nn.BatchNorm1d(self.embed_dim)
+    self.bottleneck.bias.requires_grad_(False)  
+    
+    self.cls_layer = torch.nn.Linear(
       self.embed_dim, self.output_cls, bias=False)
 
   def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -73,10 +77,9 @@ class Model(torch.nn.Module):
     x = self.pool_layer(x)
     return x
 
-  def forward_ce(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-    with torch.no_grad():
-      x = self.forward(x) # compute embedding
-      y = self.ce_layer(x) # compute class
+  def forward_cls(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    x = self.forward(x) # compute embedding
+    y = self.cls_layer(self.bottleneck(x)) # compute cls output
     return x, y
 
 

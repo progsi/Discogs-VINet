@@ -1,8 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.nn.functional import one_hot
-from torch import Tensor
-from typing import Union, Type
+from typing import List, Type
 from pytorch_metric_learning import losses, miners
 
 def init_single_loss(loss_name: str, loss_params: dict) -> Type[nn.Module]:
@@ -13,15 +12,15 @@ def init_single_loss(loss_name: str, loss_params: dict) -> Type[nn.Module]:
     Returns:
         Type[nn.Module]: initialized loss class
     """
-    print(f"Initializing {loss_name.lower()} loss with parameters:\n")
+    print(f"Initializing {loss_name} loss with parameters:")
     for key, value in loss_params.items():
-        print(f"{key.lower()}: {value}")
+        print(f"    {key.lower()}: {value}")
     if loss_name == 'TRIPLET':
         return TripletMarginLoss(margin=loss_params['MARGIN'], mining=loss_params['MINING'])
     elif loss_name == 'CENTER':
-        return CenterLoss(num_classes=loss_params['NUM_CLASSES'], feat_dim=loss_params['FEAT_DIM'])
+        return CenterLoss(num_cls=loss_params['NUM_CLS'], feat_dim=loss_params['FEAT_DIM'])
     elif loss_name == 'FOCAL':
-        return FocalLoss(num_classes=loss_params['GAMMA'])
+        return FocalLoss(gamma=loss_params['GAMMA'])
     elif loss_name == 'SOFTMAX':
         return nn.CrossEntropyLoss()
 
@@ -39,19 +38,48 @@ def init_loss(loss_config: dict) -> Type[nn.Module]:
     else:
         return WeightedMultiloss(loss_config)
 
+def is_cls_loss(loss_name: str) -> bool:
+    """Check if the loss is a classification loss.
+    Args:
+        loss_name (str): name of the loss
+    Returns:
+        bool: True if classification loss
+    """
+    return loss_name in ['SOFTMAX', 'FOCAL']
+
 class WeightedMultiloss(nn.Module):
+    """A class to make the training with multiple losses easier.
+    Args:
+        loss_config (dict): sub-dict with loss configuration
+    """
     def __init__(self, loss_config: dict, **kwargs):
-        super().__init__(WeightedMultiloss, **kwargs)
+
+        super(WeightedMultiloss, self).__init__()
         
         self.losses = nn.ModuleDict()
+        self.weights = {}
         
         for loss_name, loss_params in loss_config.items():
-            self.losses[loss_name] = (init_single_loss(loss_name, loss_params), loss_params.get('WEIGHT', 1.0))
-    
-    def forward(self, x: Tensor, y: Tensor) -> Tensor:
+            self.losses[loss_name] = init_single_loss(loss_name, loss_params)
+            self.weights[loss_name] = loss_params.get('WEIGHT', 1.0)
+            
+    def forward(self, x_emb: torch.Tensor, y_emb: torch.Tensor, 
+                x_cls: torch.Tensor, y_cls) -> torch.Tensor:
+        """Calculates the Multiloss.
+        Args:
+            x_emb (torch.Tensor): embeddings
+            y_emb (torch.Tensor): class labels per embedding
+            x_cls (torch.Tensor): output after BNN
+            y_cls (_type_): softmax of all classes specified
+        Returns:
+            torch.Tensor: Multiloss
+        """
         loss = 0
-        for loss_fn, weight in self.losses.values():
-            loss += weight * loss_fn(x, y)
+        for loss_name, loss_fn in self.losses.items():
+            if is_cls_loss(loss_name):
+                loss += self.weights[loss_name] * loss_fn(x_cls, y_cls)
+            else:
+                loss += self.weights[loss_name] * loss_fn(x_emb, y_emb)
         return loss
 
 class TripletMarginLoss(losses.TripletMarginLoss):
@@ -69,8 +97,13 @@ class TripletMarginLoss(losses.TripletMarginLoss):
             torch.Tensor: loss
         """
         hard_pairs = self.miner(x, y)
-        loss = super(x, y, hard_pairs)
-        return loss
+        loss_dict = self.compute_loss(
+            embeddings=x, 
+            labels=y, 
+            indices_tuple=hard_pairs,
+            ref_emb=None,
+            ref_labels=None)
+        return loss_dict["loss"]["losses"]
         
 class CenterLoss(nn.Module):
     """Adopted from https://github.com/KaiyangZhou/pytorch-center-loss/blob/master/center_loss.py
@@ -79,14 +112,13 @@ class CenterLoss(nn.Module):
         num_classes (int): number of classes.
         feat_dim (int): feature dimension.
     """
-    def __init__(self, num_classes: int = 10, feat_dim: int = 2, device: str = 'cuda'):
+    def __init__(self, num_cls: int = 10, feat_dim: int = 2, device: str = 'cuda'):
         super(CenterLoss, self).__init__()
-        self.num_classes = num_classes 
+        self.num_cls = num_cls 
         self.feat_dim = feat_dim
         self.device = device
 
-        self.centers = nn.Parameter(torch.randn(self.num_classes, self.feat_dim).to(self.device))
-
+        self.centers = nn.Parameter(torch.randn(self.num_cls, self.feat_dim).to(self.device))
 
     def forward(self, x: torch.tensor, y: torch.tensor) -> torch.tensor:
         """Compute loss.
@@ -97,116 +129,64 @@ class CenterLoss(nn.Module):
             torch.tensor: loss
         """
         N = x.size(0)
-        distmat = torch.pow(x, 2).sum(dim=1, keepdim=True).expand(N, self.num_classes) + \
-                  torch.pow(self.centers, 2).sum(dim=1, keepdim=True).expand(self.num_classes, N).t()
-        distmat.addmm_(1, -2, x, self.centers.t())
+        distmat = torch.pow(x, 2).sum(dim=1, keepdim=True).expand(N, self.num_cls) + \
+                  torch.pow(self.centers, 2).sum(dim=1, keepdim=True).expand(self.num_cls, N).t()
+        distmat.to(x.dtype).addmm_(1, -2, x, self.centers.to(x.dtype).t())
 
-        classes = torch.arange(self.num_classes).long().to(self.device)
-        y = y.unsqueeze(1).expand(N, self.num_classes)
-        mask = y.eq(classes.expand(N, self.num_classes))
+        classes = torch.arange(self.num_cls).long().to(self.device)
+        y = y.unsqueeze(1).expand(N, self.num_cls)
+        mask = y.eq(classes.expand(N, self.num_cls))
 
         dist = distmat * mask.float()
-        loss = dist.clamp(min=1e-12, max=1e+12).sum() / B
+        loss = dist.clamp(min=1e-12, max=1e+12).sum() / N
 
         return loss
-    
+
 class FocalLoss(nn.Module):
-    """Adopted from: https://github.com/mathiaszinnen/focal_loss_torch/blob/main/focal_loss/focal_loss.py
-    Reference: https://arxiv.org/abs/1708.02002v2
-    Args:
-        gamma (float):  The focal loss focusing parameter.
-        weights (Union[None, Tensor]): Rescaling weight given to each class.
-        If given, has to be a Tensor of size C. optional.
-        reduction (str): Specifies the reduction to apply to the output.
-        it should be one of the following 'none', 'mean', or 'sum'.
-        default 'mean'.
-        ignore_index (int): Specifies a target value that is ignored and
-        does not contribute to the input gradient. optional.
-        eps (float): smoothing to prevent log from returning inf.
-    """
-    def __init__(
-            self,
-            gamma,
-            weights: Union[None, Tensor] = None,
-            reduction: str = 'mean',
-            ignore_index=-100,
-            eps=1e-16
-            ) -> None:
-        super().__init__()
-        if reduction not in ['mean', 'none', 'sum']:
+    """https://github.com/Liu-Feng-deeplearning/CoverHunter/blob/main/src/loss.py
+    Reference: https://arxiv.org/abs/1708.02002v2"""
+
+    def __init__(self, gamma: float = 2., alpha: List = None, num_cls: int = -1,
+                reduction: str = 'mean'):
+        super(FocalLoss, self).__init__()
+        if reduction not in ['mean', 'sum']:
             raise NotImplementedError(
-                'Reduction {} not implemented.'.format(reduction)
-                )
-        assert weights is None or isinstance(weights, Tensor), \
-            'weights should be of type Tensor or None, but {} given'.format(
-                type(weights))
+            'Reduction {} not implemented.'.format(reduction))
         self.reduction = reduction
+        self.alpha = alpha
         self.gamma = gamma
-        self.ignore_index = ignore_index
-        self.eps = eps
-        self.weights = weights
+        if alpha is not None:
+            assert len(alpha) <= num_cls, "{} != {}".format(len(alpha), num_cls)
+            self.alpha = torch.tensor(self.alpha)
+        self.eps = torch.finfo(torch.float32).eps
 
-    def _get_weights(self, y: Tensor) -> Tensor:
-        if self.weights is None:
-            return torch.ones(y.shape[0])
-        weights = y * self.weights
-        return weights.sum(dim=-1)
-
-    def _process_target(
-            self, y: Tensor, num_classes: int
-            ) -> Tensor:
-        
-        #convert all ignore_index elements to zero to avoid error in one_hot
-        #note - the choice of value 0 is arbitrary, but it should not matter as these elements will be ignored in the loss calculation
-        y = y * (y != self.ignore_index) 
-        y = y.view(-1)
-        return one_hot(y, num_classes=num_classes)
-
-    def _process_preds(self, x: Tensor) -> Tensor:
-        if x.dim() == 1:
-            x = torch.vstack([1 - x, x])
-            x = x.permute(1, 0)
-            return x
-        return x.view(-1, x.shape[-1])
-
-    def _calc_pt(
-            self, y: Tensor, x: Tensor, mask: Tensor
-            ) -> Tensor:
-        p = y * x
-        p = p.sum(dim=-1)
-        p = p * ~mask
-        return p
-
-    def forward(self, x: torch.tensor, y: torch.tensor) -> torch.tensor:
-        """Compute loss.
+    def forward(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
+        """ compute focal loss for pred and label
         Args:
-            x (torch.tensor): embeddings
-            y (torch.tensor): class labels
+            y_pred: [batch_size, num_cls]
+            y_true: [batch_size]
         Returns:
-            torch.tensor: loss
+            loss
         """
-        assert torch.all((x >= 0.0) & (x <= 1.0)), ValueError(
-            'The predictions values should be between 0 and 1, \
-                make sure to pass the values to sigmoid for binary \
-                classification or softmax for multi-class classification'
-        )
-        mask = y == self.ignore_index
-        mask = mask.view(-1)
-        x = self._process_preds(x)
-        num_classes = x.shape[-1]
-        y = self._process_target(y, num_classes, mask)
-        weights = self._get_weights(y).to(x.device)
-        pt = self._calc_pt(y, x, mask)
-        focal = 1 - pt
-        nll = -torch.log(self.eps + pt)
-        nll = nll.masked_fill(mask, 0)
-        loss = weights * (focal ** self.gamma) * nll
-        return self._reduce(loss, mask, weights)
+        b = y_pred.size(0)
+        y_pred_softmax = torch.nn.Softmax(dim=1)(y_pred) + self.eps
+        ce = -torch.log(y_pred_softmax)
+        ce = ce.gather(1, y_true.view(-1, 1))
 
-    def _reduce(self, x: Tensor, mask: Tensor, weights: Tensor) -> Tensor:
+        y_pred_softmax = y_pred_softmax.gather(1, y_true.view(-1, 1))
+        weight = torch.pow(torch.sub(1., y_pred_softmax), self.gamma)
+
+        if self.alpha is not None:
+            self.alpha = self._alpha.to(y_pred.device)
+            alpha = self._alpha.gather(0, y_true.view(-1))
+            alpha = alpha.unsqueeze(1)
+            alpha = alpha / torch.sum(alpha) * b
+            weight = torch.mul(alpha, weight)
+        fl_loss = torch.mul(weight, ce).squeeze(1)
+        return self._reduce(fl_loss)
+    
+    def _reduce(self, x):
         if self.reduction == 'mean':
-            return x.sum() / (~mask * weights).sum()
-        elif self.reduction == 'sum':
-            return x.sum()
+            return torch.mean(x)
         else:
-            return x
+            return torch.sum(x)
