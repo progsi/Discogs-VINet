@@ -12,9 +12,7 @@ import numpy as np
 
 import torch
 from torch.utils.data import DataLoader
-from pytorch_metric_learning import losses
-from pytorch_metric_learning.samplers import MPerClassSampler
-# TODO import triplet miner
+from pytorch_metric_learning import miners, losses, samplers
 
 from evaluate import evaluate
 from model.nets import CQTNet
@@ -29,7 +27,7 @@ SEED = 27  # License plate code of Gaziantep, gastronomical capital of Türkiye
 def train_epoch(
     model: CQTNet,
     loader: DataLoader,
-    loss_config: dict,
+    loss_func: losses.TripletMarginLoss,
     optimizer: torch.optim.Optimizer,
     scheduler: Union[torch.optim.lr_scheduler.LRScheduler, None],
     scaler: Union[torch.cuda.amp.GradScaler, None],  # type: ignore
@@ -48,7 +46,8 @@ def train_epoch(
         with torch.autocast(device_type=device.type, dtype=torch.float16, enabled=amp):
             embeddings = model(features)
             # TODO: implement loss function
-            loss, stats = None, None
+            hard_pairs = miner(embeddings, labels)
+            loss = loss_func(embeddings, labels, hard_pairs)
         if amp:
             scaler.scale(loss).backward()  # type: ignore
             scaler.step(optimizer)
@@ -57,8 +56,6 @@ def train_epoch(
             loss.backward()
             optimizer.step()
         losses.append(loss.detach().item())
-        if stats is not None:
-            triplet_stats.append(stats)
         if (i + 1) % (len(loader) // 25) == 0 or i == len(loader) - 1:
             print(
                 f"[{(i+1):>{len(str(len(loader)))}}/{len(loader)}], Batch Loss: {loss.item():.4f}"
@@ -178,16 +175,18 @@ if __name__ == "__main__":
         clique_usage_ratio=config["TRAIN"]["CLIQUE_USAGE_RATIO"],
     )
     
-    # TODO: implement MPerClassSampler
-    sampler = MPerClassSampler(train_dataset.labels, m=config["TRAIN"]["M_PER_CLASS"])
+    sampler = samplers.MPerClassSampler(train_dataset.labels,
+                                      batch_size=config["TRAIN"]["BATCH_SIZE"], 
+                                      m=config["TRAIN"]["M_PER_CLASS"],
+                                      length_before_new_iter=len(train_dataset))
 
     train_loader = DataLoader(
         train_dataset,
         batch_size=config["TRAIN"]["BATCH_SIZE"],
-        shuffle=True,
         collate_fn=train_dataset.collate_fn,
         drop_last=True,
         num_workers=args.num_workers,
+        sampler=sampler
     )
 
     # To evaluate the model in an Information Retrieval setting
@@ -204,10 +203,11 @@ if __name__ == "__main__":
         num_workers=args.num_workers,
     )
 
+    # init the triplet loss and mining
     loss_config = {k.lower(): v for k, v in config["TRAIN"]["LOSS"].items()}
-
     triplet_loss = losses.TripletMarginLoss(margin=loss_config["margin"])
-    
+    miner = miners.TripletMarginMiner(margin=loss_config["margin"], 
+                                      type_of_triplets=loss_config["triplet_mining"])
     
     # Log the initial lr
     if not args.no_wandb:
@@ -230,7 +230,7 @@ if __name__ == "__main__":
         train_loss, lr_current, triplet_stats = train_epoch(
             model,
             train_loader,
-            loss_config,
+            triplet_loss,
             optimizer,
             scheduler,
             scaler=scaler,

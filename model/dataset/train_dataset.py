@@ -75,7 +75,7 @@ class TrainDataset(BaseDataset):
             self.n_cliques += 1
             self.n_versions += len(versions)
         print(f"{self.n_cliques:>7,} cliques found.")
-        print(f"{self.n_versions:>7,} versions found.")
+        print(f"{self.n_versions:>7,} versions found.")            
 
         # Delete versions with missing features
         print("Deleting versions with missing features...")
@@ -91,15 +91,15 @@ class TrainDataset(BaseDataset):
         print(f"{self.n_cliques:>7,} cliques left.")
         print(f"{self.n_versions:>7,} versions left.")
 
-        if clique_usage_ratio < 1.0:
-            self.n_cliques = int(self.n_cliques * clique_usage_ratio)
-            self.clique_ids = list(self.cliques.keys())[: self.n_cliques]
-            print(f"\033[33mReducing to {len(self.clique_ids):>7,} cliques.\033[0m")
+        # TODO: clique usage alternative?
 
-        self.versions = []
-        for clique_id in self.clique_ids:
-            versions = self.cliques[clique_id]
+        self.clique_ids = [] # real labels
+        self.labels = [] # integer labels
+        self.versions = [] # dict with metadata of version
+        for i, (clique_id, versions) in enumerate(self.cliques.items()):
             for version in versions:
+                self.clique_ids.append(clique_id)
+                self.labels.append(i)
                 self.versions.append(version)
      
     def __getitem__(self, index) -> Tuple[torch.Tensor, list]:
@@ -118,10 +118,9 @@ class TrainDataset(BaseDataset):
         labels : list
             List of labels. The content depends on the encode_version parameter.
         """
-
-        # Get the clique_id and the version position in the clique of the first anchor
-        label, version = self.versions[index]
-
+        label = self.labels[index]
+        # Get feature
+        version = self.versions[index]
         feature = self.load_cqt(version["youtube_id"])
 
         return feature, label
@@ -220,13 +219,7 @@ class TrainDataset(BaseDataset):
 
     @staticmethod
     def collate_fn(items) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Collate function for the dataset. Since each item contains the
-        information of 2 versions, B = 2 * number of cliques in a batch.
-
-        NOTE: If self._get_item is called with encode_version=True, the labels
-        are strings in the format 'clique_id|version_id'. In this case, the labels
-        can not be put into a tensor before converted to a string.
-
+        """Collate function for the dataset. 
         Parameters:
         -----------
         items: list
@@ -234,7 +227,7 @@ class TrainDataset(BaseDataset):
 
         Returns:
         --------
-        anchors: torch.Tensor
+        features: torch.Tensor
             The CQT features of the anchors, shape=(B, F, T), dtype=float32
             F is the number of CQT bins.
             T is the downsampled context_length,
@@ -242,7 +235,7 @@ class TrainDataset(BaseDataset):
             1D tensor of the clique labels, shape=(B,)
         """
 
-        anchors = torch.cat([item[0] for item in items], 0)
-        labels = torch.tensor([it for item in items for it in item[1]])
+        features = torch.stack([item[0] for item in items])
+        labels = torch.tensor([item[1] for item in items])
 
-        return anchors, labels
+        return features, labels
