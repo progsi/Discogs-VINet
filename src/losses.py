@@ -53,34 +53,36 @@ class WeightedMultiloss(nn.Module):
         loss_config (dict): sub-dict with loss configuration
     """
     def __init__(self, loss_config: dict, **kwargs):
-
         super(WeightedMultiloss, self).__init__()
         
-        self.losses = nn.ModuleDict()
-        self.weights = {}
+        self.losses_with_weights = []  # Store (loss_name, loss_fn, weight, is_cls_loss) tuples
         
         for loss_name, loss_params in loss_config.items():
-            self.losses[loss_name] = init_single_loss(loss_name, loss_params)
-            self.weights[loss_name] = loss_params.get('WEIGHT', 1.0)
+            loss_fn = init_single_loss(loss_name, loss_params)
+            weight = loss_params.get('WEIGHT', 1.0)
+            is_cls = is_cls_loss(loss_name)
+            self.losses_with_weights.append((loss_name, loss_fn, weight, is_cls))
             
     def forward(self, x_emb: torch.Tensor, y_emb: torch.Tensor, 
                 x_cls: torch.Tensor, y_cls) -> torch.Tensor:
-        """Calculates the Multiloss.
+        """Calculates the Multiloss and returns individual losses.
         Args:
             x_emb (torch.Tensor): embeddings
             y_emb (torch.Tensor): class labels per embedding
             x_cls (torch.Tensor): output after BNN
             y_cls (_type_): softmax of all classes specified
         Returns:
-            torch.Tensor: Multiloss
+            tuple: Total loss and a dictionary of individual losses.
         """
-        loss = 0
-        for loss_name, loss_fn in self.losses.items():
-            if is_cls_loss(loss_name):
-                loss += self.weights[loss_name] * loss_fn(x_cls, y_cls)
-            else:
-                loss += self.weights[loss_name] * loss_fn(x_emb, y_emb)
-        return loss
+        total_loss = 0
+        indiv_losses = {}
+        
+        for loss_name, loss_fn, weight, is_cls in self.losses_with_weights:
+            loss_value = weight * loss_fn(x_cls if is_cls else x_emb, y_cls if is_cls else y_emb)
+            indiv_losses[loss_name] = loss_value
+            total_loss += loss_value
+        
+        return total_loss, indiv_losses
 
 class TripletMarginLoss(losses.TripletMarginLoss):
     def __init__(self, mining: str, *args, **kwargs):
