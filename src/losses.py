@@ -189,9 +189,9 @@ class FocalLoss(nn.Module):
         b = y_pred.size(0)
         y_pred_softmax = torch.nn.Softmax(dim=1)(y_pred) + self.eps
         ce = -torch.log(y_pred_softmax)
-        ce = ce.gather(1, y_true.view(-1, 1))
+        ce = ce.gather(1, y_true.view(1, -1)) # TODO: swapped -1 and 1
 
-        y_pred_softmax = y_pred_softmax.gather(1, y_true.view(-1, 1))
+        y_pred_softmax = y_pred_softmax.gather(1, y_true.view(1, -1)) # TODO: swapped -1 and 1 
         weight = torch.pow(torch.sub(1., y_pred_softmax), self.gamma)
 
         if self.alpha is not None:

@@ -6,7 +6,7 @@ MODEL :
   # ATTENTION_DIM: 256 
   # NUM_BLOCKS = 6
   # OUTPUT_DIM = 128
-  OUTPUT_CLS: 80_017 # for bottleneck = No. of classes of Discogs-Training set. Is this a good idea?
+  OUTPUT_CLS: 76_775 # for bottleneck = No. of classes of Discogs-Training set. Is this a good idea?
   FREQUENCY_BINS: 84
   SAMPLE_RATE: 22050
   DOWNSAMPLE_FACTOR: 20 # might try out 3 (like CoverHunter)
@@ -36,7 +36,7 @@ TRAIN:
         NON_ZERO_MEAN: True # If true, the zero losses in the batch are filtered out before averaging.
       CENTER:
         WEIGHT: 0.01 # Weight of the loss.
-        NUM_CLS: 80_017 # Number of classes.
+        NUM_CLS: 76_775 # Number of classes.
         FEAT_DIM: 512 # Embedding dimension
       FOCAL:
         WEIGHT: 1.0 # Weight of the loss.

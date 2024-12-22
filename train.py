@@ -210,7 +210,7 @@ if __name__ == "__main__":
 
     loss_func = init_loss(config["TRAIN"]["LOSS"])
     if requires_cls_labels(loss_func):
-        all_labels = torch.tensor(train_dataset.labels).to(device)
+        all_labels = torch.tensor(train_dataset.clique_nums).to(device)
     else:
         all_labels = None
     # init the triplet loss and mining

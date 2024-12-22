@@ -99,10 +99,12 @@ class TrainDataset(BaseDataset):
 
         # TODO: clique usage alternative?
 
-        self.clique_ids = [] # real labels
-        self.labels = [] # integer labels
-        self.versions = [] # dict with metadata of version
+        self.clique_ids = [] # real labels, length is number of cliques
+        self.clique_nums = [] # integer labels, length is number of cliques
+        self.labels = [] # integer labels, length is the number of versions
+        self.versions = [] # dict with metadata of version, length is the number of versions
         for i, (clique_id, versions) in enumerate(self.cliques.items()):
+            self.clique_nums.append(i)
             for version in versions:
                 self.clique_ids.append(clique_id)
                 self.labels.append(i)
