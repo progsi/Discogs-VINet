@@ -43,15 +43,16 @@ def train_epoch(
         features = features.unsqueeze(1).to(device)  # (B,F,T) -> (B,1,F,T)
         labels = labels.to(device)  # (B,)
         optimizer.zero_grad()  # TODO set_to_none=True?
+        
         with torch.autocast(device_type=device.type, dtype=torch.float16, enabled=amp):
+            
+            embeddings, y = model(features)
+            
             if cls:
-                # TODO: can I make this prettier?
-                embeddings, y = model.forward_cls(features)
-                # TODO: fix this, loss dim. is not correct
                 loss = loss_func(embeddings, labels, y, labels)
             else:
-                embeddings = model(features)
                 loss = loss_func(embeddings, labels)
+                
         if amp:
             scaler.scale(loss).backward()  # type: ignore
             scaler.step(optimizer)
