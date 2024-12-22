@@ -115,14 +115,9 @@ class TripletMarginLoss(nn.Module):
             torch.Tensor: loss
         """
         hard_pairs = self.miner(x, y)
-        loss_dict = self.loss.compute_loss(
-            embeddings=x, 
-            labels=y, 
-            indices_tuple=hard_pairs,
-            ref_emb=None,
-            ref_labels=None)
-        return loss_dict["loss"]["losses"]
-        
+        loss = self.loss(embeddings=x, labels=y, indices_tuple=hard_pairs)
+        return loss
+    
 class CenterLoss(nn.Module):
     """Adopted from https://github.com/KaiyangZhou/pytorch-center-loss/blob/master/center_loss.py
     Reference: https://link.springer.com/chapter/10.1007/978-3-319-46478-7_31
