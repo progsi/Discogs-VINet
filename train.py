@@ -18,7 +18,7 @@ from evaluate import evaluate
 from src.dataset import TrainDataset, TestDataset
 from src.utils import load_model, save_model
 from src.utilities.utils import format_time
-from src.losses import init_loss, WeightedMultiloss, FocalLoss
+from src.losses import init_loss, WeightedMultiloss, FocalLoss, requires_cls_labels
 
 SEED = 27  # License plate code of Gaziantep, gastronomical capital of Türkiye
 
@@ -31,12 +31,13 @@ def train_epoch(
     scheduler: Union[torch.optim.lr_scheduler.LRScheduler, None],
     scaler: Union[torch.cuda.amp.GradScaler, None],  # type: ignore
     device: torch.device,
+    all_labels: torch.Tensor = None,
 ) -> Tuple[float, float, Union[float, None]]:
     """Train the model for one epoch. Return the average loss of the epoch."""
 
     amp = scaler is not None
-    cls = isinstance(loss_func, WeightedMultiloss) or isinstance(loss_func, FocalLoss) or isinstance(loss_func, torch.nn.CrossEntropyLoss)
-
+    cls = all_labels is not None # whether we have classification loss needed
+    
     model.train()
     losses, triplet_stats = [], []
     for i, (features, labels) in enumerate(tqdm(loader)):
@@ -49,7 +50,8 @@ def train_epoch(
             embeddings, y = model(features)
             
             if cls:
-                loss = loss_func(embeddings, labels, y, labels)
+                loss = loss_func(embeddings, labels, y, all_labels)
+                
             else:
                 loss = loss_func(embeddings, labels)
                 
@@ -65,6 +67,9 @@ def train_epoch(
             print(
                 f"[{(i+1):>{len(str(len(loader)))}}/{len(loader)}], Batch Loss: {loss.item():.4f}"
             )
+            # if MultiLoss, also record individual losses
+            if isinstance(loss_func, WeightedMultiloss):
+                wandb.log(loss_func.get_stats())
 
     if scheduler is not None:
         scheduler.step()
@@ -75,12 +80,7 @@ def train_epoch(
     # Return the average loss of the epoch
     epoch_loss = np.array(losses).mean().item()
 
-    if triplet_stats:
-        triplet_stats = sum(triplet_stats) / len(triplet_stats)
-    else:
-        triplet_stats = None
-
-    return epoch_loss, lr, triplet_stats
+    return epoch_loss, lr
 
 
 if __name__ == "__main__":
@@ -209,6 +209,10 @@ if __name__ == "__main__":
     )
 
     loss_func = init_loss(config["TRAIN"]["LOSS"])
+    if requires_cls_labels(loss_func):
+        all_labels = train_dataset.labels
+    else:
+        all_labels = None
     # init the triplet loss and mining
     
     # Log the initial lr
@@ -237,6 +241,7 @@ if __name__ == "__main__":
             scheduler,
             scaler=scaler,
             device=device,
+            all_labels=all_labels,
         )
         t_train = time.monotonic() - t0
         print(f"Average epoch Loss: {train_loss:.6f}, in {format_time(t_train)}")

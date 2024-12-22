@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.nn.functional import one_hot
 from typing import List, Type
-from pytorch_metric_learning import losses, miners
+from pytorch_metric_learning import losses, miners, distances
 
 def init_single_loss(loss_name: str, loss_params: dict) -> Type[nn.Module]:
     """Initialize a single loss function.
@@ -47,6 +47,15 @@ def is_cls_loss(loss_name: str) -> bool:
     """
     return loss_name in ['SOFTMAX', 'FOCAL']
 
+def requires_cls_labels(loss: nn.Module) -> bool:
+    """Check if the loss class requires all cls labels (eg. Center Loss or Classification loss). 
+    Args:
+        loss (nn.Module): loss module
+    Returns:
+        bool: 
+    """
+    return isinstance(loss, nn.CrossEntropyLoss) or isinstance(loss, CenterLoss) or isinstance(loss, WeightedMultiloss)
+
 class WeightedMultiloss(nn.Module):
     """A class to make the training with multiple losses easier.
     Args:
@@ -56,13 +65,15 @@ class WeightedMultiloss(nn.Module):
         super(WeightedMultiloss, self).__init__()
         
         self.losses_with_weights = []  # Store (loss_name, loss_fn, weight, is_cls_loss) tuples
-        
+        self.loss_stats = {} # to store current loss stats
+
         for loss_name, loss_params in loss_config.items():
             loss_fn = init_single_loss(loss_name, loss_params)
             weight = loss_params.get('WEIGHT', 1.0)
             is_cls = is_cls_loss(loss_name)
             self.losses_with_weights.append((loss_name, loss_fn, weight, is_cls))
-            
+            self.loss_stats[loss_name] = {}
+        
     def forward(self, x_emb: torch.Tensor, y_emb: torch.Tensor, 
                 x_cls: torch.Tensor, y_cls) -> torch.Tensor:
         """Calculates the Multiloss and returns individual losses.
@@ -70,27 +81,31 @@ class WeightedMultiloss(nn.Module):
             x_emb (torch.Tensor): embeddings
             y_emb (torch.Tensor): class labels per embedding
             x_cls (torch.Tensor): output after BNN
-            y_cls (_type_): softmax of all classes specified
+            y_cls (torch.Tensor): softmax of all classes specified
         Returns:
             tuple: Total loss and a dictionary of individual losses.
         """
         total_loss = 0
-        indiv_losses = {}
         
         for loss_name, loss_fn, weight, is_cls in self.losses_with_weights:
-            loss_value = weight * loss_fn(x_cls if is_cls else x_emb, y_cls if is_cls else y_emb)
-            indiv_losses[loss_name] = loss_value
-            total_loss += loss_value
-        
-        return total_loss, indiv_losses
+            loss = loss_fn(x_cls if is_cls else x_emb, y_cls if is_cls else y_emb)
+            loss_weighted = loss * weight
+            self.loss_stats[loss_name]["unweighted"] = loss
+            self.loss_stats[loss_name]["weighted"] = loss_weighted
+            total_loss += loss_weighted   
+        return total_loss
+    
+    def get_stats(self):
+        return self.loss_stats
 
-class TripletMarginLoss(losses.TripletMarginLoss):
+class TripletMarginLoss(nn.Module):
     def __init__(self, mining: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.mining = mining
+        self.loss = losses.TripletMarginLoss(margin=self.margin, )
         self.miner = miners.TripletMarginMiner(margin=self.margin, type_of_triplets=self.mining)
         
-    def __call__(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         """Calculate loss.
         Args:
             x (torch.Tensor): embeddings
