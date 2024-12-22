@@ -72,11 +72,12 @@ class Model(torch.nn.Module):
     self.cls_layer = torch.nn.Linear(
       self.embed_dim, self.output_cls, bias=False)
 
+  def embed(self, x: torch.Tensor) -> torch.Tensor:
+    x = self.encoder(x)
+    x = self.pool_layer(x)
+    return x
+  
   def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-    x = self.forward(x) # compute embedding
+    x = self.embed(x) # compute embedding
     y = self.cls_layer(self.bottleneck(x)) # compute cls output
     return x, y
-
-
-
-

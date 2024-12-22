@@ -143,4 +143,4 @@ class CQTNet(nn.Module):
         if self.l2_normalize:
             x = l2_normalize(x, precision="high")
 
-        return x, _ 
+        return x, None # TODO: for compatibility 

@@ -103,7 +103,7 @@ class TripletMarginLoss(nn.Module):
         super().__init__(*args, **kwargs)
         self.mining = mining
         self.margin = margin
-	self.loss = losses.TripletMarginLoss(margin=self.margin)
+        self.loss = losses.TripletMarginLoss(margin=self.margin)
         self.miner = miners.TripletMarginMiner(margin=self.margin, type_of_triplets=self.mining)
         
     def forward(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
