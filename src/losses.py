@@ -99,10 +99,10 @@ class WeightedMultiloss(nn.Module):
         return self.loss_stats
 
 class TripletMarginLoss(nn.Module):
-    def __init__(self, mining: str, *args, **kwargs):
+    def __init__(self, margin: float, mining: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.mining = mining
-        self.loss = losses.TripletMarginLoss(margin=self.margin, )
+        self.loss = losses.TripletMarginLoss(margin=self.margin)
         self.miner = miners.TripletMarginMiner(margin=self.margin, type_of_triplets=self.mining)
         
     def forward(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
@@ -114,7 +114,7 @@ class TripletMarginLoss(nn.Module):
             torch.Tensor: loss
         """
         hard_pairs = self.miner(x, y)
-        loss_dict = self.compute_loss(
+        loss_dict = self.loss.compute_loss(
             embeddings=x, 
             labels=y, 
             indices_tuple=hard_pairs,
