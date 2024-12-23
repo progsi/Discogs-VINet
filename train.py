@@ -252,7 +252,7 @@ if __name__ == "__main__":
                     "train_time": t_train,
                     "epoch": epoch,
                     "lr": lr_current,
-                    "difficult_triplets": triplet_stats,
+                    # "difficult_triplets": triplet_stats, # TODO: other stats?
                 }
             )
 
