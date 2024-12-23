@@ -59,10 +59,11 @@ def evaluate(
 
     N = len(loader)
 
-    emb_dim = model(
+    emb, _ = model(
         loader.dataset.__getitem__(0)[0].unsqueeze(0).unsqueeze(1).to(device)
-    ).shape[1]
-
+    )
+    emb_dim = emb.shape[1]
+    
     # Preallocate tensors to avoid https://github.com/pytorch/pytorch/issues/13246
     embeddings = torch.zeros((N, emb_dim), dtype=torch.float32, device=device)
     labels = torch.zeros(N, dtype=torch.int32, device=device)
