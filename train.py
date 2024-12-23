@@ -233,7 +233,7 @@ if __name__ == "__main__":
 
         t0 = time.monotonic()
         print(f" Epoch: [{epoch}/{config['TRAIN']['EPOCHS']}] ".center(25, "="))
-        train_loss, lr_current, triplet_stats = train_epoch(
+        train_loss, lr_current = train_epoch(
             model,
             train_loader,
             loss_func,
