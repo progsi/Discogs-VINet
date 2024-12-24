@@ -90,8 +90,8 @@ class WeightedMultiloss(nn.Module):
         for loss_name, loss_fn, weight, is_cls in self.losses_with_weights:
             loss = loss_fn(x_cls if is_cls else x_emb, y_cls if is_cls else y_emb)
             loss_weighted = loss * weight
-            self.loss_stats[loss_name]["unweighted"] = loss
-            self.loss_stats[loss_name]["weighted"] = loss_weighted
+            self.loss_stats[loss_name]["unweighted"] = loss.detach().item()
+            self.loss_stats[loss_name]["weighted"] = loss_weighted.detach().item()
             total_loss += loss_weighted   
         return total_loss
     
