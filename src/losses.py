@@ -159,6 +159,52 @@ class CenterLoss(nn.Module):
         return loss
 
 class FocalLoss(nn.Module):
+  """Adopted from: https://github.com/Liu-Feng-deeplearning/CoverHunter/blob/main/src/loss.py 
+  Reference https://arxiv.org/abs/1708.02002
+  """
+
+  def __init__(self, gamma: float = 2., alpha: List = None, num_cls: int = -1,
+               reduction: str = 'mean'):
+
+    super(FocalLoss, self).__init__()
+    if reduction not in ['mean', 'sum']:
+      raise NotImplementedError(
+        'Reduction {} not implemented.'.format(reduction))
+    self._reduction = reduction
+    self._alpha = alpha
+    self._gamma = gamma
+    if alpha is not None:
+      assert len(alpha) <= num_cls, "{} != {}".format(len(alpha), num_cls)
+      self._alpha = torch.tensor(self._alpha)
+    self._eps = torch.finfo(torch.float32).eps
+    return
+
+  def forward(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
+    """ compute focal loss for pred and label
+    Args:
+      y_pred: [batch_size, num_cls]
+      y_true: [batch_size]
+    Returns:
+      loss
+    """
+    b = y_pred.size(0)
+    y_pred_softmax = torch.nn.Softmax(dim=1)(y_pred) + self._eps
+    ce = -torch.log(y_pred_softmax)
+    ce = ce.gather(1, y_true.view(1, -1))
+
+    y_pred_softmax = y_pred_softmax.gather(1, y_true.view(-1, 1))
+    weight = torch.pow(torch.sub(1., y_pred_softmax), self._gamma)
+
+    if self._alpha is not None:
+      self._alpha = self._alpha.to(y_pred.device)
+      alpha = self._alpha.gather(0, y_true.view(-1))
+      alpha = alpha.unsqueeze(1)
+      alpha = alpha / torch.sum(alpha) * b
+      weight = torch.mul(alpha, weight)
+    fl_loss = torch.mul(weight, ce).squeeze(1)
+    return self._reduce(fl_loss)
+
+class FocalLoss2(nn.Module):
     """Adopted from https://pytorch.org/vision/main/_modules/torchvision/ops/focal_loss.html
     """
     def __init__(self, gamma=0, alpha=None, size_average=True, reduction="mean"):
