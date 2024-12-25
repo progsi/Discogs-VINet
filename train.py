@@ -39,7 +39,7 @@ def train_epoch(
     cls = all_labels is not None # whether we have classification loss needed
     
     model.train()
-    losses, triplet_stats = [], []
+    losses = []
     for i, (features, labels) in enumerate(tqdm(loader)):
         features = features.unsqueeze(1).to(device)  # (B,F,T) -> (B,1,F,T)
         labels = labels.to(device)  # (B,)
@@ -74,6 +74,7 @@ def train_epoch(
             if isinstance(loss_func, WeightedMultiloss) and wandb.run is not None:
                 wandb.log(loss_func.get_stats())
 
+    # TODO: implement decaying learning rate
     if scheduler is not None:
         scheduler.step()
         lr = scheduler.optimizer.param_groups[0]["lr"]
