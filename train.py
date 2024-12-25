@@ -7,7 +7,7 @@ import yaml
 import argparse
 from typing import Tuple, Union, Type
 from tqdm import tqdm
-
+import wandb
 import numpy as np
 
 import torch
@@ -50,10 +50,12 @@ def train_epoch(
             embeddings, y = model(features)
             
             if cls:
-                loss = loss_func(embeddings, labels, y, all_labels)
-                
+                loss = loss_func(embeddings, labels, y, all_labels)        
             else:
                 loss = loss_func(embeddings, labels)
+            if loss == np.nan:
+                print("Nan loss encountered, skipping batch")
+                continue
                 
         if amp:
             scaler.scale(loss).backward()  # type: ignore
@@ -68,7 +70,7 @@ def train_epoch(
                 f"[{(i+1):>{len(str(len(loader)))}}/{len(loader)}], Batch Loss: {loss.item():.4f}"
             )
             # if MultiLoss, also record individual losses
-            if isinstance(loss_func, WeightedMultiloss):
+            if isinstance(loss_func, WeightedMultiloss) and wandb.run is not None:
                 wandb.log(loss_func.get_stats())
 
     if scheduler is not None:
