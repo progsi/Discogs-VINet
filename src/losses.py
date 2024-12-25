@@ -159,6 +159,8 @@ class CenterLoss(nn.Module):
         return loss
 
 class FocalLoss(nn.Module):
+    """Adopted from https://pytorch.org/vision/main/_modules/torchvision/ops/focal_loss.html
+    """
     def __init__(self, gamma=0, alpha=None, size_average=True, reduction="mean"):
         super(FocalLoss, self).__init__()
         self.gamma = gamma
@@ -170,9 +172,6 @@ class FocalLoss(nn.Module):
 
     def forward(self, y_pred, y_true):
         p = torch.sigmoid(y_pred)
-        if y_true.dim() == 1:  # If y_true is missing the batch dim
-            y_true = y_true.unsqueeze(0).expand_as(y_pred)
-        y_true = y_true.to(dtype=y_pred.dtype)
         ce_loss = F.binary_cross_entropy_with_logits(y_pred, y_true, reduction="none")
         p_t = p * y_true + (1 - p) * (1 - y_true)
         loss = ce_loss * ((1 - p_t) ** self.gamma)

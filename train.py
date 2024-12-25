@@ -50,6 +50,7 @@ def train_epoch(
             embeddings, y = model(features)
             
             if cls:
+                # TODO: fix how to get y_cls labels
                 loss = loss_func(embeddings, labels, y, all_labels)        
             else:
                 loss = loss_func(embeddings, labels)
