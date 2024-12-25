@@ -1,7 +1,8 @@
+from typing import List, Type
+
 import torch
 import torch.nn as nn
-from torch.nn.functional import one_hot
-from typing import List, Type
+import torch.nn.functional as F
 from pytorch_metric_learning import losses, miners, distances
 
 def init_single_loss(loss_name: str, loss_params: dict) -> Type[nn.Module]:
@@ -88,7 +89,9 @@ class WeightedMultiloss(nn.Module):
         total_loss = 0
         
         for loss_name, loss_fn, weight, is_cls in self.losses_with_weights:
-            loss = loss_fn(x_cls if is_cls else x_emb, y_cls if is_cls else y_emb)
+            x = x_cls if is_cls else x_emb
+            y = y_cls if is_cls else y_emb
+            loss = loss_fn(x, y)
             loss_weighted = loss * weight
             self.loss_stats[loss_name]["unweighted"] = loss.detach().item()
             self.loss_stats[loss_name]["weighted"] = loss_weighted.detach().item()
@@ -114,7 +117,7 @@ class TripletMarginLoss(nn.Module):
         Returns:
             torch.Tensor: loss
         """
-        hard_pairs = self.miner(x, y)
+        hard_pairs = self.miner(x_emb, y_cls)
         loss = self.loss(embeddings=x_emb, labels=y_cls, indices_tuple=hard_pairs)
         return loss
     
@@ -141,14 +144,14 @@ class CenterLoss(nn.Module):
         Returns:
             torch.tensor: loss
         """
-        N = x.size(0)
-        distmat = torch.pow(x, 2).sum(dim=1, keepdim=True).expand(N, self.num_cls) + \
+        N = x_emb.size(0)
+        distmat = torch.pow(x_emb, 2).sum(dim=1, keepdim=True).expand(N, self.num_cls) + \
                   torch.pow(self.centers, 2).sum(dim=1, keepdim=True).expand(self.num_cls, N).t()
-        distmat.to(x.dtype).addmm_(x, self.centers.to(x.dtype).t(), beta=1, alpha=-2)
+        distmat.to(x_emb.dtype).addmm_(x_emb, self.centers.to(x_emb.dtype).t(), beta=1, alpha=-2)
 
         classes = torch.arange(self.num_cls).long().to(self.device)
-        y = y.unsqueeze(1).expand(N, self.num_cls)
-        mask = y.eq(classes.expand(N, self.num_cls))
+        y_cls = y_cls.unsqueeze(1).expand(N, self.num_cls)
+        mask = y_cls.eq(classes.expand(N, self.num_cls))
 
         dist = distmat * mask.float()
         loss = dist.clamp(min=1e-12, max=1e+12).sum() / N
@@ -156,50 +159,39 @@ class CenterLoss(nn.Module):
         return loss
 
 class FocalLoss(nn.Module):
-    """https://github.com/Liu-Feng-deeplearning/CoverHunter/blob/main/src/loss.py
-    Reference: https://arxiv.org/abs/1708.02002v2"""
-
-    def __init__(self, gamma: float = 2., alpha: List = None, num_cls: int = -1,
-                reduction: str = 'mean'):
+    def __init__(self, gamma=0, alpha=None, size_average=True, reduction="mean"):
         super(FocalLoss, self).__init__()
-        if reduction not in ['mean', 'sum']:
-            raise NotImplementedError(
-            'Reduction {} not implemented.'.format(reduction))
-        self.reduction = reduction
-        self.alpha = alpha
         self.gamma = gamma
-        if alpha is not None:
-            assert len(alpha) <= num_cls, "{} != {}".format(len(alpha), num_cls)
-            self.alpha = torch.tensor(self.alpha)
-        self.eps = torch.finfo(torch.float32).eps
+        self.alpha = alpha
+        if isinstance(alpha,(float,int)): self.alpha = torch.Tensor([alpha,1-alpha])
+        if isinstance(alpha,list): self.alpha = torch.Tensor(alpha)
+        self.size_average = size_average
+        self.reduction = reduction
 
-    def forward(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
-        """ compute focal loss for pred and label
-        Args:
-            y_pred: [batch_size, num_cls]
-            y_true: [batch_size]
-        Returns:
-            loss
-        """
-        b = y_pred.size(0)
-        y_pred_softmax = torch.nn.Softmax(dim=1)(y_pred) + self.eps
-        ce = -torch.log(y_pred_softmax)
-        ce = ce.gather(1, y_true.view(1, -1)) # TODO: swapped -1 and 1
+    def forward(self, y_pred, y_true):
+        p = torch.sigmoid(y_pred)
+        if y_true.dim() == 1:  # If y_true is missing the batch dim
+            y_true = y_true.unsqueeze(0).expand_as(y_pred)
+        y_true = y_true.to(dtype=y_pred.dtype)
+        ce_loss = F.binary_cross_entropy_with_logits(y_pred, y_true, reduction="none")
+        p_t = p * y_true + (1 - p) * (1 - y_true)
+        loss = ce_loss * ((1 - p_t) ** self.gamma)
 
-        y_pred_softmax = y_pred_softmax.gather(1, y_true.view(1, -1)) # TODO: swapped -1 and 1 
-        weight = torch.pow(torch.sub(1., y_pred_softmax), self.gamma)
+        if self.alpha and self.alpha >= 0:
+            alpha_t = self.alpha * y_true + (1 - self.alpha) * (1 - y_true)
+            loss = alpha_t * loss
 
-        if self.alpha is not None:
-            self.alpha = self._alpha.to(y_pred.device)
-            alpha = self._alpha.gather(0, y_true.view(-1))
-            alpha = alpha.unsqueeze(1)
-            alpha = alpha / torch.sum(alpha) * b
-            weight = torch.mul(alpha, weight)
-        fl_loss = torch.mul(weight, ce).squeeze(1)
-        return self._reduce(fl_loss)
-    
-    def _reduce(self, x):
-        if self.reduction == 'mean':
-            return torch.mean(x)
+        # Check reduction option and return loss accordingly
+        if self.reduction == "none" or self.reduction is None:
+            pass
+        elif self.reduction == "mean":
+            loss = loss.mean()
+        elif self.reduction == "sum":
+            loss = loss.sum()
         else:
-            return torch.sum(x)
+            raise ValueError(
+                f"Invalid Value for arg 'reduction': '{self.reduction} \n Supported reduction modes: 'none', 'mean', 'sum'"
+            )
+        return loss
+            
+
