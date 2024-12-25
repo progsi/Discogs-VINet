@@ -106,16 +106,16 @@ class TripletMarginLoss(nn.Module):
         self.loss = losses.TripletMarginLoss(margin=self.margin)
         self.miner = miners.TripletMarginMiner(margin=self.margin, type_of_triplets=self.mining)
         
-    def forward(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+    def forward(self, x_emb: torch.Tensor, y_cls: torch.Tensor) -> torch.Tensor:
         """Calculate loss.
         Args:
-            x (torch.Tensor): embeddings
-            y (torch.Tensor): class labels
+            x_emb (torch.Tensor): embeddings
+            y_cls (torch.Tensor): class labels
         Returns:
             torch.Tensor: loss
         """
         hard_pairs = self.miner(x, y)
-        loss = self.loss(embeddings=x, labels=y, indices_tuple=hard_pairs)
+        loss = self.loss(embeddings=x_emb, labels=y_cls, indices_tuple=hard_pairs)
         return loss
     
 class CenterLoss(nn.Module):
@@ -133,18 +133,18 @@ class CenterLoss(nn.Module):
 
         self.centers = nn.Parameter(torch.randn(self.num_cls, self.feat_dim).to(self.device))
 
-    def forward(self, x: torch.tensor, y: torch.tensor) -> torch.tensor:
+    def forward(self, x_emb: torch.tensor, y_cls: torch.tensor) -> torch.tensor:
         """Compute loss.
         Args:
-            x (torch.tensor): embeddings
-            y (torch.tensor): class labels
+            x_emb (torch.tensor): embeddings
+            y_cls (torch.tensor): class labels
         Returns:
             torch.tensor: loss
         """
         N = x.size(0)
         distmat = torch.pow(x, 2).sum(dim=1, keepdim=True).expand(N, self.num_cls) + \
                   torch.pow(self.centers, 2).sum(dim=1, keepdim=True).expand(self.num_cls, N).t()
-        distmat.to(x.dtype).addmm_(1, -2, x, self.centers.to(x.dtype).t())
+        distmat.to(x.dtype).addmm_(x, self.centers.to(x.dtype).t(), beta=1, alpha=-2)
 
         classes = torch.arange(self.num_cls).long().to(self.device)
         y = y.unsqueeze(1).expand(N, self.num_cls)
