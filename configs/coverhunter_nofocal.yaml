@@ -45,6 +45,7 @@ TRAIN:
       LR: 0.001 
       PARAMS:
         MIN_LR: 0.0001 # from 
+        GAMMA: 0.9975
         WARMUP_STEPS: None
     CUDA_DETERMINISTIC: False # Set to True for deterministic training.
     CUDA_BENCHMARK: False # Set to True for benchmarking.
