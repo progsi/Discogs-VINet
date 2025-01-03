@@ -50,13 +50,9 @@ def train_epoch(
             embeddings, y = model(features)
             
             if cls:
-                # TODO: fix how to get y_cls labels
                 loss = loss_func(embeddings, labels, y, all_labels)        
             else:
                 loss = loss_func(embeddings, labels)
-            if loss == np.nan:
-                print("Nan loss encountered, skipping batch")
-                continue
                 
         if amp:
             scaler.scale(loss).backward()  # type: ignore

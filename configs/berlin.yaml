@@ -34,7 +34,7 @@ TRAIN:
         SQUARED_DISTANCE: False # Use squared distance in the loss.
         NON_ZERO_MEAN: True # If true, the zero losses in the batch are filtered out before averaging.
     OPTIMIZER: Adam # ['Adam', 'AdamW']
-    AUTOMATIC_MIXED_PRECISION: True # Use mixed precision training.
+    AUTOMATIC_MIXED_PRECISION: False # Use mixed precision training.
     LR:
       SCHEDULE: LIN-WARMUP-PCWS # ['NONE', 'STEP', 'MULTISTEP', 'EXPONENTIAL', 'COSINE, LIN-WARMUP-PCWS'].
       LR: 0.0001 # Starting learning rate in case of a schedule or constant in case of NONE.

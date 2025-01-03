@@ -169,3 +169,47 @@ class WarmupPiecewiseConstantScheduler(_LRScheduler):
                     lr = lr_value
                     break
             return [lr for _ in self.base_lrs]
+        
+class ExponentialWithMinLR(torch.optim.lr_scheduler._LRScheduler):
+  """Adopted from: https://github.com/Liu-Feng-deeplearning/CoverHunter/blob/main/src/scheduler.py
+  Decays the learning rate of each parameter group by _gamma every epoch.
+  When last_epoch=-1, sets initial lr as lr.
+
+  Args:
+      optimizer (Optimizer): Wrapped optimizer.
+      gamma (float): Multiplicative factor of learning rate decay.
+      min_lr(float): min lr.
+      last_epoch (int): The index of last epoch. Default: -1.
+
+  """
+  def __init__(self, optimizer, gamma, min_lr, last_epoch=-1, warmup_steps=None):
+    self.gamma = gamma
+    self.min_lr = min_lr
+    self.warmup_steps = warmup_steps
+    super(ExponentialWithMinLR, self).__init__(optimizer, last_epoch)
+    
+    if self.warmup_steps:
+      print("Using Warmup for Learning: {}".format(warmup_steps))
+      self.get_lr()
+
+  def get_lr(self):
+    if self.last_epoch == 0:
+      return self.base_lrs
+
+    if not self.warmup_steps:
+      lr = [group['lr'] * self.gamma for group in self.optimizer.param_groups]
+      lr[0] = lr[0] if lr[0] > self.min_lr else self.min_lr
+    else:
+      local_step = self.optimizer._step_count
+      lr = [group['lr'] for group in self.optimizer.param_groups]
+      if local_step <= self.warmup_steps + 1:
+        lr[0] = self.base_lrs[0] * local_step / self.warmup_steps
+        # print("debug:", self.base_lrs[0], local_step / self._warmup_steps, lr[0])
+      else:
+        lr[0] = lr[0] * self.gamma
+        lr[0] = lr[0] if lr[0] > self.min_lr else self.min_lr
+    return lr
+
+  def _get_closed_form_lr(self):
+    return [base_lr * self.gamma ** self.last_epoch
+            for base_lr in self.base_lrs]

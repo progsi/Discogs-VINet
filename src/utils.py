@@ -9,6 +9,7 @@ from src.nets.coverhunter import Model as CoverHunter
 from src.lr_schedulers import (
     CosineAnnealingWarmupRestarts,
     WarmupPiecewiseConstantScheduler,
+    ExponentialWithMinLR
 )
 
 
@@ -123,6 +124,11 @@ def load_model(config: dict, device: str, mode="train"):
             )
         elif config["TRAIN"]["LR"]["SCHEDULE"].upper() == "EXPONENTIAL":
             scheduler = torch.optim.lr_scheduler.ExponentialLR(
+                optimizer,
+                **lr_params,
+            )
+        elif config["TRAIN"]["LR"]["SCHEDULE"].upper() == "EXPONENTIAL-MIN_LR":
+            scheduler = ExponentialWithMinLR(
                 optimizer,
                 **lr_params,
             )
