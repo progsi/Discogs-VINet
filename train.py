@@ -70,7 +70,6 @@ def train_epoch(
             if isinstance(loss_func, WeightedMultiloss) and wandb.run is not None:
                 wandb.log(loss_func.get_stats())
 
-    # TODO: implement decaying learning rate
     if scheduler is not None:
         scheduler.step()
         lr = scheduler.optimizer.param_groups[0]["lr"]
