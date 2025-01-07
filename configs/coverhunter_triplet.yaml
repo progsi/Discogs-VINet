@@ -30,8 +30,8 @@ TRAIN:
     LOSS:
       TRIPLET:
         MARGIN: 0.3 # Triplet loss margin
-        MINING: semihard # key from pytorch-metric-learning
-        SQUARED_DISTANCE: False # Use squared distance in the loss.
+        POSITIVE_MINING: random # ['hard', 'random', 'easy']
+        NEGATIVE_MINING: hard # ['hard', 'random', 'semi-hard']        SQUARED_DISTANCE: False # Use squared distance in the loss.
         NON_ZERO_MEAN: True # If true, the zero losses in the batch are filtered out before averaging.
     OPTIMIZER: Adam # ['Adam', 'AdamW']
     AUTOMATIC_MIXED_PRECISION: False # Use mixed precision training.

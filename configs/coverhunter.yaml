@@ -31,7 +31,8 @@ TRAIN:
       TRIPLET:
         WEIGHT: 0.1 # Weight of the loss.
         MARGIN: 0.3 # Triplet loss margin
-        MINING: hard # key from pytorch-metric-learning
+        POSITIVE_MINING: hard # ['hard', 'random', 'easy']
+        NEGATIVE_MINING: hard # ['hard', 'random', 'semi-hard']        SQUARED_DISTANCE: False # Use squared distance in the loss.
         SQUARED_DISTANCE: False # Use squared distance in the loss.
         NON_ZERO_MEAN: True # If true, the zero losses in the batch are filtered out before averaging.
       CENTER:
