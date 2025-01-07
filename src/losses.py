@@ -1,9 +1,11 @@
-from typing import List, Type
+from typing import List, Type, Tuple, Union
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from pytorch_metric_learning import losses, miners, distances
+from pytorch_metric_learning import losses, miners
+from src.utilities.tensor_op import pairwise_distance_matrix, create_pos_neg_masks
+
 
 def init_single_loss(loss_name: str, loss_params: dict) -> Type[nn.Module]:
     """Initialize a single loss function.
@@ -17,7 +19,9 @@ def init_single_loss(loss_name: str, loss_params: dict) -> Type[nn.Module]:
     for key, value in loss_params.items():
         print(f"    {key.lower()}: {value}")
     if loss_name == 'TRIPLET':
-        return TripletMarginLoss(margin=loss_params['MARGIN'], mining=loss_params['MINING'])
+        return TripletMarginLoss(margin=loss_params['MARGIN'], 
+                                 positive_mining=loss_params['POSITIVE_MINING'],
+                                 negative_mining=loss_params['NEGATIVE_MINING'])
     elif loss_name == 'CENTER':
         return CenterLoss(num_cls=loss_params['NUM_CLS'], feat_dim=loss_params['FEAT_DIM'])
     elif loss_name == 'FOCAL':
@@ -102,24 +106,373 @@ class WeightedMultiloss(nn.Module):
         return self.loss_stats
 
 class TripletMarginLoss(nn.Module):
-    def __init__(self, margin: float, mining: str, *args, **kwargs):
+    """A class to compute the triplet loss for given embeddings. 
+    Adopted from https://github.com/raraz15/Discogs-VINet/blob/main/model/loss.py
+        positive_mining: str
+            Either "random", "easy, or "hard".
+        negative_mining: str
+            Either "random" or "hard".
+        margin: float
+            The margin value in the triplet loss. In the case of semi-hard mining, this
+            value is also used to sample the negatives.
+        squared_distance: bool
+            If True, the pairwise distance matrix is squared before computing the loss.
+        non_zero_mean: bool
+            If True, the loss is averaged only over the non-zero losses.
+        stats: bool
+            If True, return the number of positive triplets in the batch. Else return None.
+    """
+    def __init__(self, margin: float, positive_mining: str, negative_mining: str, squared_distance: bool = False, 
+                 non_zero_mean: bool = False, stats: bool = False, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.mining = mining
         self.margin = margin
-        self.loss = losses.TripletMarginLoss(margin=self.margin)
-        self.miner = miners.TripletMarginMiner(margin=self.margin, type_of_triplets=self.mining)
+        self.positive_mining_mode = positive_mining
+        self.negative_mining_mode = negative_mining
+        self.squared_distance = squared_distance
+        self.non_zero_mean = non_zero_mean
+        self.stats = stats
         
-    def forward(self, x_emb: torch.Tensor, y_cls: torch.Tensor) -> torch.Tensor:
-        """Calculate loss.
-        Args:
-            x_emb (torch.Tensor): embeddings
-            y_cls (torch.Tensor): class labels
+    def forward(
+        self,
+        embeddings: torch.Tensor,
+        labels: torch.Tensor
+    ) -> Tuple[torch.Tensor, Union[int, None]]:
+        """Compute the triplet loss for given embeddings. We use online sampling to
+        select the positive and negative samples. You can choose between random and hard
+        mining for both the negatives and positives. The margin value is used to compute the
+        triplet loss. If squared_distance is True, the pairwise distance matrix is squared.
+
+        Parameters:
+        -----------
+        embeddings: torch.Tensor
+            2D tensor of shape (n, d) where n is the number of samples and d is the
+            dimensionality of the samples.
+        labels: torch.Tensor
+            1D tensor of shape (n,) where labels[i] is the int label of the i-th sample.
         Returns:
-            torch.Tensor: loss
+        --------
+        loss: torch.Tensor
+            Tensor of shape (1,) representing the average triplet loss of the batch.
+        num_unsatisfied_triplets: int
+            Number of triplets that do not satisfy the margin condition in the batch.
+            Only returned if stats is True.
         """
-        hard_pairs = self.miner(x_emb, y_cls)
-        loss = self.loss(embeddings=x_emb, labels=y_cls, indices_tuple=hard_pairs)
-        return loss
+
+        # Compute the pairwise distance matrix of the anchors
+        distance_matrix = pairwise_distance_matrix(embeddings, squared=self.squared_distance)
+
+        # Create masks for the positive and negative samples
+        mask_pos, mask_neg = create_pos_neg_masks(labels)
+
+        # Sample the positives first
+        if self.positive_mining_mode.lower() == "random":
+            dist_AP, _ = self.random_positive_sampling(distance_matrix, mask_pos)
+        elif self.positive_mining_mode.lower() == "hard":
+            dist_AP, _ = self.hard_positive_mining(distance_matrix, mask_pos)
+        elif self.positive_mining_mode.lower() == "easy":
+            dist_AP, _ = self.easy_positive_mining(distance_matrix, mask_pos)
+        else:
+            raise ValueError("Other positive mining types are not supported.")
+
+        if self.negative_mining_mode.lower() == "random":
+            dist_AN, _ = self.random_negative_sampling(distance_matrix, mask_neg)
+        elif self.negative_mining_mode.lower() == "hard":
+            dist_AN, _ = self.hard_negative_mining(distance_matrix, mask_neg)
+        elif self.negative_mining_mode.lower() == "semi-hard":
+            dist_AN, _ = self.semi_hard_negative_mining(
+                distance_matrix, dist_AP, mask_neg, self.margin
+            )
+        else:
+            raise ValueError("Other negative mining types are not supported.")
+
+        # Compute the triplet loss
+        loss = F.relu(dist_AP - dist_AN + self.margin)
+
+        # See how many triplets per batch are positive
+        if self.stats:
+            num_unsatisfied_triplets = int((loss > 0).sum().item())
+        else:
+            num_unsatisfied_triplets = None
+
+        # Average the loss over the batch (can filter out zero losses if needed)
+        if self.non_zero_mean:
+            mask = loss > 0
+            if any(mask):
+                loss = loss[mask]
+        loss = loss.mean()
+
+        # TODO: implement num_unsatisfied_triplets
+        if num_unsatisfied_triplets is not None:
+            return loss, num_unsatisfied_triplets
+        else:
+            return loss
+    
+    @staticmethod
+    def random_positive_sampling(
+        distance_matrix: torch.Tensor, mask_pos: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Given a pairwise distance matrix of all the samples and a mask that indicates the
+        possible indices for sampling positives, randomly sample a positive sample for each
+        anchor. All samples are treated as anchor points.
+
+        Parameters:
+        -----------
+        distance_matrix: torch.Tensor
+            2D tensor of shape (n, n) where distance_matrix[i, j] is the distance between
+            x[i] and y[j], i.e. the pairwise distance matrix.
+        mask_pos: torch.Tensor
+            See create_pos_neg_masks() for details.
+
+        Returns:
+        --------
+        anchor_pos_distances: torch.Tensor
+            1D tensor of shape (n,), distances between the anchors and their chosen
+            positive samples.
+        positive_indices: torch.Tensor
+            1D tensor of shape (n,) where positive_indices[i] is the index of the positive
+            sample for the i-th anchor point.
+        """
+
+        # Get the indices of the positive samples for each anchor point
+        positive_indices = torch.multinomial(mask_pos, 1)
+
+        # Get the distances between the anchors and their positive samples
+        anchor_pos_distances = torch.gather(distance_matrix, 1, positive_indices)
+
+        return anchor_pos_distances.squeeze(1), positive_indices.squeeze(1)
+    
+    @staticmethod
+    def random_negative_sampling(
+        distance_matrix: torch.Tensor, mask_neg: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Given a pairwise distance matrix of all the samples and a mask that indicates the
+        possible indices for sampling negatives, randomly sample a negative sample for each
+        anchor. All samples are treated as anchor points.
+
+        Parameters:
+        -----------
+        distance_matrix: torch.Tensor
+            2D tensor of shape (n, n) where distance_matrix[i, j] is the distance between
+            x[i] and y[j], i.e. the pairwise distance matrix.
+        mask_neg: torch.Tensor
+            See create_pos_neg_masks() for details.
+
+        Returns:
+        --------
+        anchor_neg_distances: torch.Tensor
+            1D tensor of shape (n,), distances between the anchors and their chosen
+            negative samples.
+        negative_indices: torch.Tensor
+            1D tensor of shape (n,) where negative_indices[i] is the index of the negative
+            sample for the i-th anchor point.
+        """
+
+        # Get the indices of the negative samples for each anchor point
+        negative_indices = torch.multinomial(mask_neg, 1)
+
+        # Get the distances between the anchors and their negative samples
+        anchor_neg_distances = torch.gather(distance_matrix, 1, negative_indices)
+
+        return anchor_neg_distances.squeeze(1), negative_indices.squeeze(1)
+    
+    @staticmethod
+    def hard_positive_mining(
+        distance_matrix: torch.Tensor, mask_pos: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Given a pairwise distance matrix of all the anchors and a mask that indicates the
+        possible indices for sampling positives, mine the hardest positive sample for each
+        anchor. All samples are treated as anchor points.
+
+        Parameters:
+        -----------
+        distance_matrix: torch.Tensor
+            2D tensor of shape (n, n) where distance_matrix[i, j] is the distance between
+            x[i] and y[j], i.e. the pairwise distance matrix.
+        mask_pos: torch.Tensor
+            See create_pos_neg_masks() for details.
+
+        Returns:
+        --------
+        anchor_pos_distances: torch.Tensor
+            1D tensor of shape (n,) containing the distances between the anchors and their
+            chosen positive samples.
+        positive_indices: torch.Tensor
+            1D tensor of shape (n,) where positive_indices[i] is the index of the hardest
+            positive sample for the i-th anchor point.
+        """
+
+        # Select the hardest positive for each anchor
+        anchor_pos_distances, positive_indices = torch.max(distance_matrix * mask_pos, 1)
+
+        return anchor_pos_distances, positive_indices
+
+    @staticmethod
+    def hard_negative_mining(
+        distance_matrix: torch.Tensor, mask_neg: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Given a pairwise distance matrix of all the anchors and a mask that indicates the
+        possible indices for sampling negatives, mine the hardest negative sample for each
+        anchor. All samples are treated as anchor points.
+
+        Parameters:
+        -----------
+        distance_matrix: torch.Tensor
+            2D tensor of shape (n, n) where distance_matrix[i, j] is the distance between
+            x[i] and y[j], i.e. the pairwise distance matrix.
+        mask_neg: torch.Tensor
+            See create_pos_neg_masks() for details.
+
+        Returns:
+        --------
+        anchor_neg_distances: torch.Tensor
+            1D tensor of shape (n,) containing the distances between the anchors and their
+            chosen negative samples.
+        negative_indices: torch.Tensor
+            1D tensor of shape (n,) where negative_indices[i] is the index of the hardest
+            negative sample for the i-th anchor point.
+        """
+
+        # make sure same data type as distance_matrix
+        inf = torch.tensor(
+            float("inf"), device=distance_matrix.device, dtype=distance_matrix.dtype
+        )
+        zero = torch.tensor(0.0, device=distance_matrix.device, dtype=distance_matrix.dtype)
+
+        # Modify the distance matrix to only consider the negative samples
+        mask_neg = torch.where(mask_neg == 0, inf, zero)
+
+        # Get the indices of the hardest negative samples for each anchor point
+        anchor_neg_distances, negative_indices = torch.min(distance_matrix + mask_neg, 1)
+
+        return anchor_neg_distances, negative_indices
+
+    # TODO: check if this is correct
+    @staticmethod
+    def semi_hard_negative_mining(
+        distance_matrix: torch.Tensor,
+        dist_AP: torch.Tensor,
+        mask_neg: torch.Tensor,
+        margin: float,
+        mode: str = "hard",
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Given a pairwise distance matrix of all the anchors and a mask that indicates the
+        possible indices for sampling negatives, mine the semi-hard negative sample for each
+        anchor. All samples are treated as anchor points. If there are no possible semi-hard
+        negatives, sample randomly.
+
+        Parameters:
+        -----------
+        distance_matrix: torch.Tensor
+            2D tensor of shape (n, n) where distance_matrix[i, j] is the distance between
+            x[i] and y[j], i.e. the pairwise distance matrix.
+        dist_AP: torch.Tensor
+            1D tensor of shape (n,) where dist_AP[i] is the distance between the i-th anchor
+            and its positive sample.
+        mask_neg: torch.Tensor
+            See create_pos_neg_masks() for details.
+        margin: float
+            Margin for the triplet loss.
+        mode: str
+            Either "hard" or "random". If "hard", the hardest negative sample from the region
+            is selected for each anchor. If "random", a random negative sample is selected
+            from the region.
+
+        Returns:
+        --------
+        anchor_neg_distances: torch.Tensor
+            1D tensor of shape (n,) containing the distances between the anchors and their
+            chosen negative samples.
+        negative_indices: torch.Tensor
+            1D tensor of shape (n,) where negative_indices[i] is the index of the semi-hard
+            negative sample for the i-th anchor point.
+        """
+
+        raise NotImplementedError("Having difficulty in implementing it.")
+
+        assert mode in {"hard", "random"}, "mode must be either 'hard' or 'random'"
+        assert margin > 0, "margin must be greater than 0"
+        assert (
+            distance_matrix.shape[0] == dist_AP.shape[0]
+        ), "distance_matrix and dist_AP must have the same length"
+        assert dist_AP.ndim == 1, "dist_AP must be a 1D tensor"
+
+        # Get the region for semi-hard negatives
+        mask_semi_hard_neg = (
+            (dist_AP.unsqueeze(1) < distance_matrix)
+            & (distance_matrix < (dist_AP.unsqueeze(1) + margin))
+            & mask_neg.bool()
+        ).float()
+
+        # Initialize the tensors to store the distances and indices of the semi-hard negatives
+        device = distance_matrix.device
+        n = distance_matrix.shape[0]
+        anchor_neg_distances = torch.zeros(n, dtype=torch.float32, device=device)
+        negative_indices = torch.zeros(n, dtype=torch.int32, device=device)
+
+        # Search for a semi-hard negative for each anchor, positive pair
+        for i in range(n):
+            dist = distance_matrix[i].unsqueeze(0)
+            mask = mask_semi_hard_neg[i].unsqueeze(0)
+            # check if the hollow-sphere is empty
+            if mask.any():  # there is at least one semi-hard negative
+                if mode == "hard":  # choose the hardest example in the hollow-sphere
+                    negative_indices[i], anchor_neg_distances[i] = hard_negative_mining(
+                        dist, mask
+                    )
+                else:  # choose a random example in the hollow-sphere
+                    negative_indices[i], anchor_neg_distances[i] = random_negative_sampling(
+                        dist, mask
+                    )
+            else:  # there are no semi-hard negatives
+                if mode == "hard":  # resort to hard negatives
+                    negative_indices[i], anchor_neg_distances[i] = hard_negative_mining(
+                        dist, mask_neg[i].unsqueeze(0)
+                    )
+                else:  # resort to random negatives
+                    negative_indices[i], anchor_neg_distances[i] = random_negative_sampling(
+                        dist, mask_neg[i].unsqueeze(0)
+                    )
+        return anchor_neg_distances, negative_indices
+
+    @staticmethod
+    def easy_positive_mining(
+        distance_matrix: torch.Tensor, mask_pos: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Given a pairwise distance matrix of all the anchors and a mask that indicates the
+        possible indices for sampling positives, mine the easiest positive sample for each
+        anchor. All samples are treated as anchor points.
+
+        Parameters:
+        -----------
+        distance_matrix: torch.Tensor
+            2D tensor of shape (n, n) where distance_matrix[i, j] is the distance between
+            x[i] and y[j], i.e. the pairwise distance matrix.
+        mask_pos: torch.Tensor
+            See create_pos_neg_masks() for details.
+
+        Returns:
+        --------
+        anchor_pos_distances: torch.Tensor
+            1D tensor of shape (n,) containing the distances between the anchors and their
+            chosen positive samples.
+        positive_indices: torch.Tensor
+            1D tensor of shape (n,) where positive_indices[i] is the index of the hardest
+            positive sample for the i-th anchor point.
+        """
+
+        # make sure same data type as distance_matrix
+        inf = torch.tensor(
+            float("inf"), device=distance_matrix.device, dtype=distance_matrix.dtype
+        )
+        zero = torch.tensor(0.0, device=distance_matrix.device, dtype=distance_matrix.dtype)
+
+        # Modify the distance matrix to only consider the positive samples
+        mask_pos = torch.where(mask_pos == 0, inf, zero)
+
+        # Select the easiest positive for each anchor
+        anchor_pos_distances, positive_indices = torch.min(distance_matrix + mask_pos, 1)
+
+        return anchor_pos_distances, positive_indices
     
 class CenterLoss(nn.Module):
     """Adopted from https://github.com/KaiyangZhou/pytorch-center-loss/blob/master/center_loss.py
