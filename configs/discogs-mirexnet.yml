@@ -1,5 +1,5 @@
 MODEL :
-  NAME: Discogs-VINet-MIREX-only_train
+  NAME: Discogs-MIREXNet
   ARCHITECTURE: cqtnet
   CONV_CHANNEL: 40
   EMBEDDING_SIZE: 512
