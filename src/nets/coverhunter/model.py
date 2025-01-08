@@ -2,7 +2,7 @@ from typing import Tuple
 import torch
 
 from src.nets.coverhunter.conformer import ConformerEncoder
-from src.nets.coverhunter.pooling import AttentiveStatisticsPooling
+from src.nets.pooling import AttentiveStatisticsPooling
 
 # CoverHunter parameters
 INPUT_DIM = 84 # instead of 96 in CoverHunter paper
@@ -29,7 +29,7 @@ class Encoder(torch.nn.Module):
     self.num_blocks = num_blocks
 
     self.global_cmvn = torch.nn.BatchNorm1d(self.input_dim)
-    self.encoder = ConformerEncoder(
+    self.blocks = ConformerEncoder(
       input_size=self.input_dim,
       output_size=self.output_dim,
       linear_units=self.attention_dim,
@@ -38,13 +38,18 @@ class Encoder(torch.nn.Module):
     return
 
   def forward(self, x: torch.Tensor) -> torch.Tensor:
+    # B x 1 x F x T --> B x T x F 
     x = x.squeeze(1)
+
     x = self.global_cmvn(x).transpose(1, 2)
+
+    # xs_lens: B
     xs_lens = torch.full(
       [x.size(0)], 
       fill_value=x.size(1), 
       dtype=torch.long).to(x.device).long()
-    x, _ = self.encoder(x, xs_lens=xs_lens, decoding_chunk_size=-1)
+    x, _ = self.blocks(x, xs_lens=xs_lens, decoding_chunk_size=-1)
+    # Out: B x T/4 x F
     return x
 
    
@@ -53,7 +58,7 @@ class Model(torch.nn.Module):
   """
   def __init__(self, input_dim: int = INPUT_DIM, embed_dim: int = EMBED_DIM, 
                output_dim: int = OUTPUT_DIM, attention_dim: int = ATTENTION_DIM,
-               num_blocks: int = NUM_BLOCKS,  output_cls: int = OUTPUT_CLS):
+               num_blocks: int = NUM_BLOCKS,  output_cls: int = None):
     super(Model, self).__init__()
     self.input_dim = input_dim
     self.embed_dim = embed_dim
@@ -68,11 +73,18 @@ class Model(torch.nn.Module):
     self.pool_layer = AttentiveStatisticsPooling(
       self.embed_dim, output_channels=self.embed_dim)
     
-    self.bottleneck = torch.nn.BatchNorm1d(self.embed_dim)
-    self.bottleneck.bias.requires_grad_(False)  
-    
-    self.cls_layer = torch.nn.Linear(
-      self.embed_dim, self.output_cls, bias=False)
+    if self.output_cls is not None:
+      # Define bottleneck layer
+      self.bottleneck = torch.nn.BatchNorm1d(self.embed_dim)
+      self.bottleneck.bias.requires_grad_(False)
+
+      # Define cls_layer, applied after the bottleneck
+      self.cls_layer = torch.nn.Sequential(
+        self.bottleneck,  # Include bottleneck as part of the pipeline
+        torch.nn.Linear(self.embed_dim, self.output_cls, bias=False)
+      )
+    else:
+      self.cls_layer = None
 
   def embed(self, x: torch.Tensor) -> torch.Tensor:
     x = self.encoder(x)
@@ -81,5 +93,8 @@ class Model(torch.nn.Module):
   
   def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
     x = self.embed(x) # compute embedding
-    y = self.cls_layer(self.bottleneck(x)) # compute cls output
+    if self.cls_layer is not None:
+      y = self.cls_layer(x) # compute cls output
+    else:
+      y = None
     return x, y

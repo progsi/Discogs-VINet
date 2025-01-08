@@ -511,6 +511,62 @@ class CenterLoss(nn.Module):
 
         return loss
 
+class PrototypicalLoss(torch.nn.Module):
+    '''
+    Loss class deriving from Module for the prototypical loss function defined below
+    Adopted from: https://github.com/orobix/Prototypical-Networks-for-Few-shot-Learning-PyTorch/blob/master/src/prototypical_loss.py
+    Inspired by https://github.com/jakesnell/prototypical-networks/blob/master/protonets/models/few_shot.py
+    '''
+    def __init__(self, n_support):
+        super(PrototypicalLoss, self).__init__()
+        self.n_support = n_support
+
+    def forward(self, x_emb, y_cls):
+        '''
+        Compute the barycentres by averaging the features of n_support
+        samples for each class in target, computes then the distances from each
+        samples' features to each one of the barycentres, computes the
+        log_probability for each n_query samples for each one of the current
+        classes, of appartaining to a class c, loss and accuracy are then computed
+        and returned
+        Args:
+        - input: the model output for a batch of samples
+        - target: ground truth for the above batch of samples
+        - n_support: number of samples to keep in account when computing
+        barycentres, for each one of the current classes
+        '''
+        def supp_idxs(c):
+            # FIXME when torch will support where as np
+            return y_cls.eq(c).nonzero()[:self.n_support].squeeze(1)
+
+        # FIXME when torch.unique will be available on cuda too
+        classes = torch.unique(y_cls)
+        n_classes = len(classes)
+        # FIXME when torch will support where as np
+        # assuming n_query, n_target constants
+        n_query = y_cls.eq(classes[0].item()).sum().item() - self.n_support
+
+        support_idxs = list(map(supp_idxs, classes))
+
+        prototypes = torch.stack([x_emb[idx_list].mean(0) for idx_list in support_idxs])
+        # FIXME when torch will support where as np
+        query_idxs = torch.stack(list(map(lambda c: y_cls.eq(c).nonzero()[self.n_support:], classes))).view(-1)
+
+        query_samples = input.to('cpu')[query_idxs]
+        dists = pairwise_distance_matrix(query_samples, prototypes)
+
+        log_p_y = F.log_softmax(-dists, dim=1).view(n_classes, n_query, -1)
+
+        target_inds = torch.arange(0, n_classes)
+        target_inds = target_inds.view(n_classes, 1, 1)
+        target_inds = target_inds.expand(n_classes, n_query, 1).long()
+
+        loss_val = -log_p_y.gather(2, target_inds).squeeze().view(-1).mean()
+        _, y_hat = log_p_y.max(2)
+        acc_val = y_hat.eq(target_inds.squeeze(2)).float().mean()
+
+        return loss_val # ,  acc_val TODO: is this acc_val needed?
+  
 class FocalLoss(nn.Module):
     """Adopted from: https://github.com/Liu-Feng-deeplearning/CoverHunter/blob/main/src/loss.py 
     Reference https://arxiv.org/abs/1708.02002

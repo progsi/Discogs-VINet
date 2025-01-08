@@ -2,15 +2,14 @@ import torch
 import torch.nn as nn
 
 from src.utilities.tensor_op import l2_normalize
-
-from .aux import IBN, GeM, Linear, SoftPool
+from src.nets.pooling import Linear, IBN, GeM, SoftPool
 
 
 class CQTNet(nn.Module):
     def __init__(
         self,
         ch_in: int,
-        ch_out: int,
+        embed_dim: int,
         norm: str = "bn",
         pool: str = "adaptive_max",
         l2_normalize: bool = True,
@@ -19,8 +18,9 @@ class CQTNet(nn.Module):
         super().__init__()
 
         assert ch_in > 0
-        assert ch_out > 0
+        assert embed_dim > 0
 
+        self.embed_dim = embed_dim
         self.l2_normalize = l2_normalize
 
         if norm.lower() == "bn":
@@ -117,14 +117,14 @@ class CQTNet(nn.Module):
             raise NotImplementedError
 
         if projection.lower() == "linear":
-            self.proj = Linear(16 * ch_in, ch_out, bias=False)
+            self.proj = Linear(16 * ch_in, embed_dim, bias=False)
         elif projection.lower() == "affine":
-            self.proj = Linear(16 * ch_in, ch_out)
+            self.proj = Linear(16 * ch_in, embed_dim)
         elif projection.lower() == "mlp":
             self.proj = nn.Sequential(
                 Linear(16 * ch_in, 32 * ch_in),
                 nn.ReLU(inplace=True),
-                Linear(32 * ch_in, ch_out, bias=False),  # TODO bias=True?
+                Linear(32 * ch_in, embed_dim, bias=False),  # TODO bias=True?
             )
         elif projection.lower() == "none":
             self.proj = nn.Identity()

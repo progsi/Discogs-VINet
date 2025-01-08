@@ -32,7 +32,7 @@ def build_model(config: dict, device: str) -> CQTNet:
     if config["MODEL"]["ARCHITECTURE"].upper() == "CQTNET":
         model = CQTNet(
             ch_in=config["MODEL"]["CONV_CHANNEL"],
-            ch_out=config["MODEL"]["EMBEDDING_SIZE"],
+            embed_dim=config["MODEL"]["EMBEDDING_SIZE"],
             norm=config["MODEL"]["NORMALIZATION"],
             pool=config["MODEL"]["POOLING"],
             l2_normalize=config["MODEL"]["L2_NORMALIZE"],

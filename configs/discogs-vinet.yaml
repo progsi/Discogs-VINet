@@ -22,7 +22,7 @@ TRAIN:
   EPOCHS: 50 # Number of epochs to train.
   LOSS:
     TRIPLET:
-      MARGIN: 0.1 # Triplet loss margin
+      MARGIN: 0.3 # Triplet loss margin
       POSITIVE_MINING: random # ['hard', 'random', 'easy']
       NEGATIVE_MINING: hard # ['hard', 'random', 'semi-hard']
       SQUARED_DISTANCE: False # Use squared distance in the loss.
