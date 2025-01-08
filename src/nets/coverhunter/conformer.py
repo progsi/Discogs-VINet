@@ -1275,7 +1275,7 @@ class ConformerEncoder(torch.nn.Module):
                                           decoding_chunk_size,
                                           self.static_chunk_size,
                                           num_decoding_left_chunks)
-    for layer in self.encoders:
+    for layer in self.encoders: # TODO: debug here: output vectors are almost the same!
       xs, chunk_masks, _, _ = layer(xs, chunk_masks, pos_emb, mask_pad)
     if self.normalize_before:
       xs = self.after_norm(xs)

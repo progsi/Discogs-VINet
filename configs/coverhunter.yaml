@@ -2,11 +2,11 @@ MODEL :
   NAME: berlin
   # Model
   ARCHITECTURE: coverhunter
-  EMBEDDING_SIZE: 512
-  # ATTENTION_DIM: 256 
-  # NUM_BLOCKS = 6
-  # OUTPUT_DIM = 128
-  OUTPUT_CLS: 76_775 # for bottleneck = No. of classes of Discogs-Training set. Is this a good idea?
+  EMBEDDING_SIZE: 256 # in paper: either 128 or 256
+  ATTENTION_DIM: 256 
+  NUM_BLOCKS: 6
+  OUTPUT_DIM: 256 # same as embedding size!
+  OUTPUT_CLS: 76_775 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.
   FREQUENCY_BINS: 84
   SAMPLE_RATE: 22050
   DOWNSAMPLE_FACTOR: 20 # might try out 3 (like CoverHunter)
@@ -38,7 +38,7 @@ TRAIN:
       CENTER:
         WEIGHT: 0.01 # Weight of the loss.
         NUM_CLS: 76_775 # Number of classes.
-        FEAT_DIM: 512 # Embedding dimension
+        FEAT_DIM: 256 # Embedding dimension
       FOCAL:
         WEIGHT: 1.0 # Weight of the loss.
         GAMMA: 2.0 # Focal loss gamma.

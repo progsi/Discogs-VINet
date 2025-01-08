@@ -3,9 +3,9 @@ MODEL :
   # Model
   ARCHITECTURE: coverhunter
   EMBEDDING_SIZE: 512
-  # ATTENTION_DIM: 256 
-  # NUM_BLOCKS = 6
-  # OUTPUT_DIM = 128
+  ATTENTION_DIM: 256 
+  NUM_BLOCKS: 6
+  OUTPUT_DIM: 256 # same as embedding size!
   OUTPUT_CLS: null # not needed for triplet loss
   FREQUENCY_BINS: 84
   SAMPLE_RATE: 22050

@@ -13,15 +13,13 @@ ATTENTION_DIM = 256
 NUM_BLOCKS = 6
 OUTPUT_DIM = 128
 
-# Classes
-OUTPUT_CLS = 30_000 # default from CoverHunter
 
 class Encoder(torch.nn.Module):
   """Encoding part of CoverHunter, returning a variable length processed CQT feature.
   """
 
-  def __init__(self, input_dim: int = INPUT_DIM, output_dim: int = OUTPUT_DIM, 
-               attention_dim: int = ATTENTION_DIM, num_blocks: int = NUM_BLOCKS):
+  def __init__(self, input_dim: int, output_dim: int, 
+               attention_dim: int, num_blocks: int):
     super(Encoder, self).__init__()
     self.input_dim = input_dim
     self.output_dim = output_dim
@@ -41,7 +39,7 @@ class Encoder(torch.nn.Module):
     # B x 1 x F x T --> B x T x F 
     x = x.squeeze(1)
 
-    x = self.global_cmvn(x).transpose(1, 2)
+    x = self.global_cmvn(x).transpose(1, 2) # TODO: need to remove at inference?
 
     # xs_lens: B
     xs_lens = torch.full(

@@ -42,9 +42,9 @@ def build_model(config: dict, device: str) -> CQTNet:
         model = CoverHunter(
             input_dim=config["MODEL"]["FREQUENCY_BINS"],
             embed_dim=config["MODEL"]["EMBEDDING_SIZE"],
-            output_dim=config["MODEL"]["EMBEDDING_SIZE"],
-            # attention_dim=config["MODEL"]["ATTENTION_DIM"],
-            # num_blocks=config["MODEL"]["NUM_BLOCKS"],
+            output_dim=config["MODEL"]["OUTPUT_DIM"],
+            attention_dim=config["MODEL"]["ATTENTION_DIM"],
+            num_blocks=config["MODEL"]["NUM_BLOCKS"],
             output_cls=config["MODEL"]["OUTPUT_CLS"],
         ).to(device)
     else:
