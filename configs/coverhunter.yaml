@@ -2,14 +2,14 @@ MODEL :
   NAME: berlin
   # Model
   ARCHITECTURE: coverhunter
-  EMBEDDING_SIZE: 256 # in paper: either 128 or 256
-  ATTENTION_DIM: 256 
+  EMBEDDING_SIZE: 128 # in paper: either 128 or 256
+  ATTENTION_DIM: 256 # 2x embedding size?
   NUM_BLOCKS: 6
-  OUTPUT_DIM: 256 # same as embedding size!
+  OUTPUT_DIM: 128 # same as embedding size!
   OUTPUT_CLS: 76_775 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.
   FREQUENCY_BINS: 84
   SAMPLE_RATE: 22050
-  DOWNSAMPLE_FACTOR: 20 # might try out 3 (like CoverHunter)
+  DOWNSAMPLE_FACTOR: 3 # might try out 20?
   L2_NORMALIZE: True # L2 normalize the embeddings.
   SIMILARITY_SEARCH: MIPS # ['MCSS', 'NNS', 'MIPS'] If L2_NORMALIZE is True, use 'MIPS' for faster search.
   CHECKPOINT_DIR: logs/checkpoints/
@@ -38,11 +38,11 @@ TRAIN:
       CENTER:
         WEIGHT: 0.01 # Weight of the loss.
         NUM_CLS: 76_775 # Number of classes.
-        FEAT_DIM: 256 # Embedding dimension
+        FEAT_DIM: 128 # Embedding dimension
       FOCAL:
         WEIGHT: 1.0 # Weight of the loss.
         GAMMA: 2.0 # Focal loss gamma.
-    OPTIMIZER: Adam # ['Adam', 'AdamW']
+    OPTIMIZER: AdamW # ['Adam', 'AdamW']
     AUTOMATIC_MIXED_PRECISION: False # Use mixed precision training.
     LR: # see https://github.com/Liu-Feng-deeplearning/CoverHunter/blob/main/egs/covers80/config/hparams.yaml
       SCHEDULE: EXPONENTIAL-MIN_LR # ['NONE', 'STEP', 'MULTISTEP', 'EXPONENTIAL' 'EXPONENTIAL-MIN_LR', 'COSINE, LIN-WARMUP-PCWS'].
@@ -50,6 +50,8 @@ TRAIN:
       PARAMS:
         MIN_LR: 0.0001 # from 
         GAMMA: 0.9975
+        ADAM_B1: 0.8 # AdamW betas
+        ADAM_B2: 0.99 
     CUDA_DETERMINISTIC: False # Set to True for deterministic training.
     CUDA_BENCHMARK: False # Set to True for benchmarking.
     CLIQUE_USAGE_RATIO: 1.0 # Fraction of training data to use. Useful for debugging. 1.0 to use 100% of data.

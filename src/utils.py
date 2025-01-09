@@ -106,7 +106,8 @@ def load_model(config: dict, device: str, mode="train"):
             )
         elif config["TRAIN"]["OPTIMIZER"].upper() == "ADAMW":
             optimizer = torch.optim.AdamW(
-                model.parameters(), lr=config["TRAIN"]["LR"]["LR"]
+                model.parameters(), lr=config["TRAIN"]["LR"]["LR"], 
+                betas=(config["TRAIN"]["LR"]["ADAM_B1"], config["TRAIN"]["LR"]["ADAM_B2"])
             )
         else:
             raise ValueError("Optimizer not recognized.")

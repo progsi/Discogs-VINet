@@ -12,13 +12,13 @@ import numpy as np
 
 import torch
 from torch.utils.data import DataLoader
-from pytorch_metric_learning import miners, samplers
+from pytorch_metric_learning import samplers
 
 from evaluate import evaluate
 from src.dataset import TrainDataset, TestDataset
 from src.utils import load_model, save_model
 from src.utilities.utils import format_time
-from src.losses import init_loss, WeightedMultiloss, FocalLoss, requires_cls_labels
+from src.losses import init_loss, WeightedMultiloss, requires_cls_labels
 
 SEED = 27  # License plate code of Gaziantep, gastronomical capital of Türkiye
 

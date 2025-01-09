@@ -2,14 +2,14 @@ MODEL :
   NAME: berlin
   # Model
   ARCHITECTURE: coverhunter
-  EMBEDDING_SIZE: 256
+  EMBEDDING_SIZE: 128
   ATTENTION_DIM: 256 
   NUM_BLOCKS: 6
   OUTPUT_DIM: 256 # same as embedding size!
   OUTPUT_CLS: null # only needed when having cls loss
   FREQUENCY_BINS: 84
   SAMPLE_RATE: 22050
-  DOWNSAMPLE_FACTOR: 20 # might try out 3 (like CoverHunter)
+  DOWNSAMPLE_FACTOR: 3 # might try out 20?
   L2_NORMALIZE: True # L2 normalize the embeddings.
   SIMILARITY_SEARCH: MIPS # ['MCSS', 'NNS', 'MIPS'] If L2_NORMALIZE is True, use 'MIPS' for faster search.
   CHECKPOINT_DIR: logs/checkpoints/
@@ -38,7 +38,7 @@ TRAIN:
       CENTER:
         WEIGHT: 0.1 # self-adjusted
         NUM_CLS: 76_775 # Number of classes.
-        FEAT_DIM: 256 # Embedding dimension
+        FEAT_DIM: 128 # Embedding dimension
       FOCAL:
         WEIGHT: 1.0 # Weight of the loss.
         GAMMA: 2.0 # Focal loss gamma.
