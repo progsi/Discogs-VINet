@@ -53,6 +53,8 @@ class LyraCNet(nn.Module):
         super(LyraCNet, self).__init__()
         
         self.num_blocks = num_blocks
+        self.embed_dim = embed_dim
+        
         nChannels = [16]
         for i in range(num_blocks):
             nChannels.append(16 * widen_factor * (2 ** i))
