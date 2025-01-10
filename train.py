@@ -36,7 +36,6 @@ def train_epoch(
     """Train the model for one epoch. Return the average loss of the epoch."""
 
     amp = scaler is not None
-    cls = all_labels is not None # whether we have classification loss needed
     
     model.train()
     losses = []
@@ -47,12 +46,20 @@ def train_epoch(
         
         with torch.autocast(device_type=device.type, dtype=torch.float16, enabled=amp):
             
-            embeddings, y = model(features)
+            out = model(features)
             
-            if cls:
-                loss = loss_func(embeddings, labels, y, all_labels)        
-            else:
+            if len(out) == 1: # only embedding
+                embeddings = out
                 loss = loss_func(embeddings, labels)
+            elif len(out) == 2: # embedding + classification
+                embeddings, y = out
+                loss = loss_func(embeddings, labels, y, all_labels)
+            elif len(out) == 3: # 2 embeddings + classification
+                embeddings2, embeddings1, y = out
+                loss = loss_func(
+                    x_emb=embeddings1, y_emb=labels, 
+                    x_cls=y, y_cls=all_labels, 
+                    x_emb2=embeddings2)
                 
         if amp:
             scaler.scale(loss).backward()  # type: ignore
@@ -177,6 +184,7 @@ if __name__ == "__main__":
         context_length=config["TRAIN"]["CONTEXT_LENGTH"],
         mean_downsample_factor=config["MODEL"]["DOWNSAMPLE_FACTOR"],
         clique_usage_ratio=config["TRAIN"]["CLIQUE_USAGE_RATIO"],
+        scale=config["TRAIN"]["SCALE"]
     )
     
     sampler = samplers.MPerClassSampler(train_dataset.labels,
@@ -198,6 +206,7 @@ if __name__ == "__main__":
         config["TRAIN"]["VALIDATION_CLIQUES"],
         config["TRAIN"]["FEATURES_DIR"],
         mean_downsample_factor=config["MODEL"]["DOWNSAMPLE_FACTOR"],
+        scale=config["TRAIN"]["SCALE"]
     )
     eval_loader = DataLoader(
         eval_dataset,

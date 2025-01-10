@@ -8,8 +8,8 @@ class CosineAnnealingWarmupRestarts(_LRScheduler):
     https://github.com/katsura-jp/pytorch-cosine-annealing-with-warmup/blob/master/cosine_annealing_warmup/scheduler.py
 
         optimizer (Optimizer): Wrapped optimizer.
-        first_cycle_steps (int): First cycle step size.
-        cycle_mult(float): Cycle steps magnification. Default: -1.
+        t_0 (int): First cycle step size.
+        t_mult(float): Cycle steps magnification. Default: -1.
         max_lr(float): First cycle's max learning rate. Default: 0.1.
         min_lr(float): Min learning rate. Default: 0.001.
         warmup_steps(int): Linear warmup step size. Default: 0.
@@ -20,25 +20,25 @@ class CosineAnnealingWarmupRestarts(_LRScheduler):
     def __init__(
         self,
         optimizer: torch.optim.Optimizer,
-        first_cycle_steps: int,
-        cycle_mult: float = 1.0,
+        t_0: int,
+        t_mult: float = 1.0,
         max_lr: float = 0.001,
         min_lr: float = 0.0001,
         warmup_steps: int = 5,
         gamma: float = 1.0,
         last_epoch: int = -1,
     ):
-        assert warmup_steps < first_cycle_steps
+        assert warmup_steps < t_0
 
-        self.first_cycle_steps = first_cycle_steps  # first cycle step size
-        self.cycle_mult = cycle_mult  # cycle steps magnification
+        self.t_0 = t_0  # first cycle step size
+        self.t_mult = t_mult  # cycle steps magnification
         self.base_max_lr = max_lr  # first max learning rate
         self.max_lr = max_lr  # max learning rate in the current cycle
         self.min_lr = min_lr  # min learning rate
         self.warmup_steps = warmup_steps  # warmup step size
         self.gamma = gamma  # decrease rate of max learning rate by cycle
 
-        self.cur_cycle_steps = first_cycle_steps  # first cycle step size
+        self.cur_cycle_steps = t_0  # first cycle step size
         self.cycle = 0  # cycle count
         self.step_in_cycle = last_epoch  # step size of the current cycle
 
@@ -86,35 +86,35 @@ class CosineAnnealingWarmupRestarts(_LRScheduler):
                 self.cycle += 1
                 self.step_in_cycle = self.step_in_cycle - self.cur_cycle_steps
                 self.cur_cycle_steps = (
-                    int((self.cur_cycle_steps - self.warmup_steps) * self.cycle_mult)
+                    int((self.cur_cycle_steps - self.warmup_steps) * self.t_mult)
                     + self.warmup_steps
                 )
         else:
-            if epoch >= self.first_cycle_steps:
-                if self.cycle_mult == 1.0:
-                    self.step_in_cycle = epoch % self.first_cycle_steps
-                    self.cycle = epoch // self.first_cycle_steps
+            if epoch >= self.t_0:
+                if self.t_mult == 1.0:
+                    self.step_in_cycle = epoch % self.t_0
+                    self.cycle = epoch // self.t_0
                 else:
                     n = int(
                         math.log(
                             (
-                                epoch / self.first_cycle_steps * (self.cycle_mult - 1)
+                                epoch / self.t_0 * (self.t_mult - 1)
                                 + 1
                             ),
-                            self.cycle_mult,
+                            self.t_mult,
                         )
                     )
                     self.cycle = n
                     self.step_in_cycle = epoch - int(
-                        self.first_cycle_steps
-                        * (self.cycle_mult**n - 1)
-                        / (self.cycle_mult - 1)
+                        self.t_0
+                        * (self.t_mult**n - 1)
+                        / (self.t_mult - 1)
                     )
-                    self.cur_cycle_steps = self.first_cycle_steps * self.cycle_mult ** (
+                    self.cur_cycle_steps = self.t_0 * self.t_mult ** (
                         n
                     )
             else:
-                self.cur_cycle_steps = self.first_cycle_steps
+                self.cur_cycle_steps = self.t_0
                 self.step_in_cycle = epoch
 
         self.max_lr = self.base_max_lr * (self.gamma**self.cycle)

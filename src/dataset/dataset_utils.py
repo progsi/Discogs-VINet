@@ -22,3 +22,27 @@ def mean_downsample_cqt(cqt: np.ndarray, mean_window_length: int) -> np.ndarray:
     reshaped_cqt = cqt[:new_T * mean_window_length].reshape(new_T, mean_window_length, cqt_F)
     new_cqt = reshaped_cqt.mean(axis=1)
     return new_cqt
+
+
+def normalize_cqt(cqt: np.ndarray) -> np.ndarray:
+    """_summary_
+    Args:
+        cqt (np.ndarray): cqtspectrogram
+    Returns:
+        np.ndarray: normalized cqt spectrogram
+    """
+    cqt /= (
+                np.max(cqt) + 1e-6
+            )
+    return cqt
+    
+def upscale_cqt_values(cqt: np.ndarray) -> np.ndarray:
+    """This is done in CoverHunter to obtain higher values in the CQT spectrogram.
+    See: https://github.com/Liu-Feng-deeplearning/CoverHunter/blob/main/src/cqt.py
+    Args:
+        cqt (np.ndarray): _description_
+    """
+    cqt = np.maximum(cqt, 1e-10)
+    ref_value = np.max(cqt)
+    cqt = 20 * np.log10(cqt) - 20 * np.log10(ref_value)
+    return cqt

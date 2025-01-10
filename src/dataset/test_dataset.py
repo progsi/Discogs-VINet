@@ -8,7 +8,7 @@ import numpy as np
 import torch
 
 from .dataset import BaseDataset
-from .dataset_utils import mean_downsample_cqt
+from .dataset_utils import mean_downsample_cqt, normalize_cqt, upscale_cqt_values
 
 
 class TestDataset(BaseDataset):
@@ -26,7 +26,7 @@ class TestDataset(BaseDataset):
         features_dir: str,
         mean_downsample_factor: int = 20,
         cqt_bins: int = 84,
-        scale: bool = True,
+        scale: str = "norm",
     ) -> None:
         """Initializes the dataset
 
@@ -40,8 +40,9 @@ class TestDataset(BaseDataset):
             Factor by which to downsample the features by taking the mean
         cqt_bins : int
             Number of CQT bins in a feature array
-        scale : bool
-            Whether to scale the features to [0,1]
+        scale : str
+            "normalize": scale the features to [0,1]
+            "upscale": upscale the features (eg. used by CoverHunter)
         """
 
         assert cqt_bins > 0, f"Expected cqt_bins > 0, got {cqt_bins}"
@@ -194,11 +195,13 @@ class TestDataset(BaseDataset):
         feature = np.where(feature < 0, 0, feature)
 
         # Scale the feature to [0,1] if specified
-        if self.scale:
+        if self.scale == "normalize":
             feature /= (
                 np.max(feature) + 1e-6
             )  # Add a small value to avoid division by zero
-
+        elif self.scale == "upscale":
+            feature = upscale_cqt_values(feature)
+        
         # Transpose to (F, T) because the CQT is stored as (T, F)
         feature = feature.T
 

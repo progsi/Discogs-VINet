@@ -6,7 +6,7 @@ import numpy as np
 import torch
 
 from .dataset import BaseDataset
-from .dataset_utils import mean_downsample_cqt
+from .dataset_utils import mean_downsample_cqt, normalize_cqt, upscale_cqt_values
 
 class TrainDataset(BaseDataset):
     """Training dataset.
@@ -25,7 +25,7 @@ class TrainDataset(BaseDataset):
         context_length: int,
         mean_downsample_factor: int = 20,
         cqt_bins: int = 84,
-        scale: bool = True,
+        scale: str = "norm",
         clique_usage_ratio: float = 1.0,
     ) -> None:
         """Initializes the training dataset.
@@ -43,8 +43,9 @@ class TrainDataset(BaseDataset):
             Factor by which to downsample the features by averaging
         cqt_bins : int
             Number of CQT bins in a feature array
-        scale : bool
-            Whether to scale the features to [0,1]
+        scale : str
+            "normalize": scale the features to [0,1]
+            "upscale": upscale the features (eg. used by CoverHunter)
         clique_usage_ratio: float
             Ratio of the cliques to use. If < 1.0, it will reduce the number of cliques.
             Usefull for debugging, short tests.
@@ -212,10 +213,12 @@ class TrainDataset(BaseDataset):
         feature = np.where(feature < 0, 0, feature)
 
         # Scale the feature to [0,1] if specified
-        if self.scale:
+        if self.scale == "normalize":
             feature /= (
                 np.max(feature) + 1e-6
             )  # Add a small value to avoid division by zero
+        elif self.scale == "upscale":
+            feature = upscale_cqt_values(feature)
 
         # Transpose to (F, T) because the CQT is stored as (T, F)
         feature = feature.T

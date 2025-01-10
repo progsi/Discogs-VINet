@@ -58,7 +58,7 @@ class Encoder(torch.nn.Module):
     return x
 
    
-class Model(torch.nn.Module):
+class CoverHunter(torch.nn.Module):
   """CoverHunter model. Includes an encoder, pooling layer, bottleneck and classifier. 
   """
   def __init__(
@@ -70,7 +70,7 @@ class Model(torch.nn.Module):
       num_blocks: int = NUM_BLOCKS,  
       output_cls: int = None,
       l2_normalize: bool = True):
-    super(Model, self).__init__()
+    super(CoverHunter, self).__init__()
     self.input_dim = input_dim
     self.embed_dim = embed_dim
     self.output_cls = output_cls

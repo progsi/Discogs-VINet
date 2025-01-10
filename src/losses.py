@@ -27,7 +27,9 @@ def init_single_loss(loss_name: str, loss_params: dict) -> Type[nn.Module]:
     elif loss_name == 'FOCAL':
         return FocalLoss(gamma=loss_params['GAMMA'])
     elif loss_name == 'SOFTMAX':
-        return nn.CrossEntropyLoss()
+        return nn.CrossEntropyLoss(label_smoothing=loss_params['LABEL_SMOOTHING'])
+    elif loss_name == 'PROTOTYPICAL':
+        return PrototypicalLoss(n_support=loss_params['N_SUPPORT'])
 
 def init_loss(loss_config: dict) -> Type[nn.Module]:
     """Initialize a loss function, either single loss or weihted Multiloss.
@@ -79,21 +81,30 @@ class WeightedMultiloss(nn.Module):
             self.losses_with_weights.append((loss_name, loss_fn, weight, is_cls))
             self.loss_stats[loss_name] = {}
         
-    def forward(self, x_emb: torch.Tensor, y_emb: torch.Tensor, 
-                x_cls: torch.Tensor, y_cls) -> torch.Tensor:
+    def forward(self, 
+                x_emb: torch.Tensor, 
+                y_emb: torch.Tensor, 
+                x_cls: torch.Tensor, 
+                y_cls: torch.Tensor,
+                x_emb2: torch.Tensor = None,                 
+                ) -> torch.Tensor:
         """Calculates the Multiloss and returns individual losses.
         Args:
             x_emb (torch.Tensor): embeddings
             y_emb (torch.Tensor): class labels per embedding
             x_cls (torch.Tensor): output after BNN
             y_cls (torch.Tensor): softmax of all classes specified
+            x_emb2: torch.Tensor = None: more embeddings (eg. in case of LyraCNet). Should be used for Prototypical Loss.                 
         Returns:
             tuple: Total loss and a dictionary of individual losses.
         """
         total_loss = 0
         
         for loss_name, loss_fn, weight, is_cls in self.losses_with_weights:
-            x = x_cls if is_cls else x_emb
+            if loss_name == 'PROTOTYPICAL' and x_emb2 is not None:
+                x = x_emb2
+            else:
+                x = x_cls if is_cls else x_emb
             y = y_cls if is_cls else y_emb
             loss = loss_fn(x, y)
             loss_weighted = loss * weight
@@ -530,10 +541,8 @@ class PrototypicalLoss(torch.nn.Module):
         classes, of appartaining to a class c, loss and accuracy are then computed
         and returned
         Args:
-        - input: the model output for a batch of samples
-        - target: ground truth for the above batch of samples
-        - n_support: number of samples to keep in account when computing
-        barycentres, for each one of the current classes
+        - x_emb: the model output for a batch of samples
+        - y_cls: ground truth for the above batch of samples
         '''
         def supp_idxs(c):
             # FIXME when torch will support where as np
@@ -552,12 +561,12 @@ class PrototypicalLoss(torch.nn.Module):
         # FIXME when torch will support where as np
         query_idxs = torch.stack(list(map(lambda c: y_cls.eq(c).nonzero()[self.n_support:], classes))).view(-1)
 
-        query_samples = input.to('cpu')[query_idxs]
+        query_samples = x_emb[query_idxs]
         dists = pairwise_distance_matrix(query_samples, prototypes)
 
         log_p_y = F.log_softmax(-dists, dim=1).view(n_classes, n_query, -1)
 
-        target_inds = torch.arange(0, n_classes)
+        target_inds = torch.arange(0, n_classes).to(y_cls.device)
         target_inds = target_inds.view(n_classes, 1, 1)
         target_inds = target_inds.expand(n_classes, n_query, 1).long()
 

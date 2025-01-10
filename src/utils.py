@@ -5,7 +5,8 @@ import yaml
 import torch
 
 from src.nets.cqtnet import CQTNet
-from src.nets.coverhunter import Model as CoverHunter
+from src.nets.coverhunter import CoverHunter
+from src.nets.lyracnet import LyraCNet
 from src.lr_schedulers import (
     CosineAnnealingWarmupRestarts,
     WarmupPiecewiseConstantScheduler,
@@ -47,6 +48,14 @@ def build_model(config: dict, device: str) -> CQTNet:
             num_blocks=config["MODEL"]["NUM_BLOCKS"],
             output_cls=config["MODEL"]["OUTPUT_CLS"],
         ).to(device)
+    elif config["MODEL"]["ARCHITECTURE"].upper() == "LYRACNET":
+        model = LyraCNet(
+            depth=config["MODEL"]["DEPTH"], 
+            embed_dim=config["MODEL"]["EMBEDDING_SIZE"], 
+            num_blocks=config["MODEL"]["NUM_BLOCKS"],
+            widen_factor=config["MODEL"]["WIDEN_FACTOR"],
+            num_classes=config["MODEL"]["OUTPUT_CLS"],
+            ).to(device)
     else:
         raise ValueError("Model architecture not recognized.")
     _, _ = count_model_parameters(model)
@@ -107,11 +116,14 @@ def load_model(config: dict, device: str, mode="train"):
         elif config["TRAIN"]["OPTIMIZER"].upper() == "ADAMW":
             optimizer = torch.optim.AdamW(
                 model.parameters(), lr=config["TRAIN"]["LR"]["LR"], 
-                betas=(config["TRAIN"]["LR"]["ADAM_B1"], config["TRAIN"]["LR"]["ADAM_B2"])
+                betas=(config["TRAIN"]["ADAM_B1"], config["TRAIN"]["ADAM_B2"])
             )
         else:
             raise ValueError("Optimizer not recognized.")
-
+        if config["TRAIN"].get("WEIGHT_DECAY"):
+            for param_group in optimizer.param_groups:
+                param_group['weight_decay'] = config["TRAIN"]["WEIGHT_DECAY"]
+            
         if "PARAMS" in config["TRAIN"]["LR"]:
             lr_params = {
                 k.lower(): v for k, v in config["TRAIN"]["LR"]["PARAMS"].items()
