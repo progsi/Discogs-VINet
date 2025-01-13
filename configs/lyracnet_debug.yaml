@@ -25,7 +25,7 @@ TRAIN:
     M_PER_CLASS: 4 # Number of versions per clique during a training iteration.
     SCALE: normalize # this is done in CoverHunter. Maybe due to Conformer?
     CONTEXT_LENGTH: 7600 # Number of frames to consider as context, before downsampling.
-    BATCH_SIZE: 216 # Number of versions in batch.
+    BATCH_SIZE: 8 # Number of versions in batch.
     EPOCHS: 200 # Number of epochs to train.
     LOSS:
       TRIPLET:
@@ -42,8 +42,11 @@ TRAIN:
       PROTOTYPICAL:
         WEIGHT: 1.0
         N_SUPPORT: 2
-      SOFTMAX:
-        LABEL_SMOOTHING: 0.1
+      #SOFTMAX:
+      #  LABEL_SMOOTHING: 0.1
+      FOCAL:
+        WEIGHT: 1.0 # Weight of the loss.
+        GAMMA: 2.0 # Focal loss gamma.
     OPTIMIZER: Adam # ['Adam', 'AdamW']
     WEIGHT_DECAY: 0.00001 # Weight decay.
     AUTOMATIC_MIXED_PRECISION: True # Use mixed precision training.

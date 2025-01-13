@@ -53,13 +53,14 @@ def train_epoch(
                 loss = loss_func(embeddings, labels)
             elif len(out) == 2: # embedding + classification
                 embeddings, y = out
-                loss = loss_func(embeddings, labels, y, all_labels)
+                loss = loss_func(embeddings, labels, y)
             elif len(out) == 3: # 2 embeddings + classification
                 embeddings2, embeddings1, y = out
                 loss = loss_func(
-                    x_emb=embeddings1, y_emb=labels, 
-                    x_cls=y, y_cls=all_labels, 
-                    x_emb2=embeddings2)
+                    embs=embeddings1, 
+                    labels=labels, 
+                    cls_preds=y, 
+                    embs2=embeddings2)
                 
         if amp:
             scaler.scale(loss).backward()  # type: ignore

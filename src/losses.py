@@ -68,7 +68,7 @@ class WeightedMultiloss(nn.Module):
     Args:
         loss_config (dict): sub-dict with loss configuration
     """
-    def __init__(self, loss_config: dict, **kwargs):
+    def __init__(self, loss_config: dict):
         super(WeightedMultiloss, self).__init__()
         
         self.losses_with_weights = []  # Store (loss_name, loss_fn, weight, is_cls_loss) tuples
@@ -82,32 +82,34 @@ class WeightedMultiloss(nn.Module):
             self.loss_stats[loss_name] = {}
         
     def forward(self, 
-                x_emb: torch.Tensor, 
-                y_emb: torch.Tensor, 
-                x_cls: torch.Tensor, 
-                y_cls: torch.Tensor,
-                x_emb2: torch.Tensor = None,                 
+                embs: torch.Tensor, 
+                labels: torch.Tensor, 
+                cls_preds: torch.Tensor, 
+                embs2: torch.Tensor = None,                 
                 ) -> torch.Tensor:
         """Calculates the Multiloss and returns individual losses.
         Args:
-            x_emb (torch.Tensor): embeddings
-            y_emb (torch.Tensor): class labels per embedding
-            x_cls (torch.Tensor): output after BNN
-            y_cls (torch.Tensor): softmax of all classes specified
-            x_emb2: torch.Tensor = None: more embeddings (eg. in case of LyraCNet). Should be used for Prototypical Loss.                 
+            embs (torch.Tensor): embeddings
+            labels (torch.Tensor): class labels per embedding
+            cls_preds (torch.Tensor): output after BNN
+            embs2: torch.Tensor = None: more embeddings (eg. in case of LyraCNet). Should be used for Prototypical Loss.                 
         Returns:
             tuple: Total loss and a dictionary of individual losses.
         """
         total_loss = 0
         
         for loss_name, loss_fn, weight, is_cls in self.losses_with_weights:
-            if loss_name == 'PROTOTYPICAL' and x_emb2 is not None:
-                x = x_emb2
+            # prototypical loss requires different embeddings
+            if loss_name == 'PROTOTYPICAL' and embs2 is not None:
+                x = embs2
             else:
-                x = x_cls if is_cls else x_emb
-            y = y_cls if is_cls else y_emb
-            loss = loss_fn(x, y)
+                x = cls_preds if is_cls else embs
+            
+            # compute and weigh
+            loss = loss_fn(x, labels)
             loss_weighted = loss * weight
+            
+            # collect stats
             self.loss_stats[loss_name]["unweighted"] = loss.detach().item()
             self.loss_stats[loss_name]["weighted"] = loss_weighted.detach().item()
             total_loss += loss_weighted   
@@ -607,9 +609,9 @@ class FocalLoss(nn.Module):
         b = y_pred.size(0)
         y_pred_softmax = torch.nn.Softmax(dim=1)(y_pred) + self._eps
         ce = -torch.log(y_pred_softmax)
-        ce = ce.gather(1, y_true.view(1, -1))
+        ce = ce.gather(1, y_true.view(-1, 1))
 
-        y_pred_softmax = y_pred_softmax.gather(1, y_true.view(1, -1))
+        y_pred_softmax = y_pred_softmax.gather(1, y_true.view(-1, 1))
         weight = torch.pow(torch.sub(1., y_pred_softmax), self._gamma)
 
         if self._alpha is not None:
