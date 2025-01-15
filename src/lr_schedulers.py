@@ -3,7 +3,7 @@ import torch
 from torch.optim.lr_scheduler import _LRScheduler
 
 
-class CosineAnnealingWarmupRestarts(_LRScheduler):
+class CosineAnnealingWarmRestartsWithWarmup(_LRScheduler):
     """
     https://github.com/katsura-jp/pytorch-cosine-annealing-with-warmup/blob/master/cosine_annealing_warmup/scheduler.py
 
@@ -42,7 +42,7 @@ class CosineAnnealingWarmupRestarts(_LRScheduler):
         self.cycle = 0  # cycle count
         self.step_in_cycle = last_epoch  # step size of the current cycle
 
-        super(CosineAnnealingWarmupRestarts, self).__init__(optimizer, last_epoch)
+        super(CosineAnnealingWarmRestartsWithWarmup, self).__init__(optimizer, last_epoch)
 
         # set learning rate min_lr
         self.init_lr()

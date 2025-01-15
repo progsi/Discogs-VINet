@@ -9,7 +9,7 @@ from src.nets.cqtnet import CQTNet
 from src.nets.coverhunter import CoverHunter
 from src.nets.lyracnet import LyraCNet
 from src.lr_schedulers import (
-    CosineAnnealingWarmupRestarts,
+    CosineAnnealingWarmRestartsWithWarmup,
     WarmupPiecewiseConstantScheduler,
     ExponentialWithMinLR
 )
@@ -150,7 +150,7 @@ def load_model(config: dict, device: str, mode="train"):
         elif config["TRAIN"]["LR"]["SCHEDULE"].upper() == "NONE":
             scheduler = None
         elif config["TRAIN"]["LR"]["SCHEDULE"].upper() == "COSINE-WARMUP":
-            scheduler = CosineAnnealingWarmupRestarts(
+            scheduler = CosineAnnealingWarmRestartsWithWarmup(
                 optimizer,
                 **lr_params,
             )
