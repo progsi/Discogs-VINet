@@ -46,3 +46,15 @@ def upscale_cqt_values(cqt: np.ndarray) -> np.ndarray:
     ref_value = np.max(cqt)
     cqt = 20 * np.log10(cqt) - 20 * np.log10(ref_value)
     return cqt
+
+def normalize_cqt(cqt: np.ndarray) -> np.ndarray:
+    """_summary_
+    Args:
+        cqt (np.ndarray): cqt spectrogram
+    Returns:
+        np.ndarray: normalized cqt spectrogram
+    """
+    cqt /= (
+                np.max(cqt) + 1e-6
+            )
+    return cqt

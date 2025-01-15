@@ -196,9 +196,7 @@ class TestDataset(BaseDataset):
 
         # Scale the feature to [0,1] if specified
         if self.scale == "normalize":
-            feature /= (
-                np.max(feature) + 1e-6
-            )  # Add a small value to avoid division by zero
+            feature = normalize_cqt(feature)
         elif self.scale == "upscale":
             feature = upscale_cqt_values(feature)
         
