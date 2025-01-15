@@ -3,6 +3,7 @@ from typing import Tuple
 
 import yaml
 import torch
+from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 
 from src.nets.cqtnet import CQTNet
 from src.nets.coverhunter import CoverHunter
@@ -148,8 +149,13 @@ def load_model(config: dict, device: str, mode="train"):
             )
         elif config["TRAIN"]["LR"]["SCHEDULE"].upper() == "NONE":
             scheduler = None
-        elif config["TRAIN"]["LR"]["SCHEDULE"].upper() == "COSINE":
+        elif config["TRAIN"]["LR"]["SCHEDULE"].upper() == "COSINE-WARMUP":
             scheduler = CosineAnnealingWarmupRestarts(
+                optimizer,
+                **lr_params,
+            )
+        elif config["TRAIN"]["LR"]["SCHEDULE"].upper() == "COSINE":
+            scheduler = CosineAnnealingWarmRestarts(
                 optimizer,
                 **lr_params,
             )

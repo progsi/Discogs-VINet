@@ -166,3 +166,6 @@ cython_debug/
 #.idea/
 src/nets/conformer_pt.py
 src/nets/conformer_legacy.py
+src/nets/msa.py
+src/nets/camhsa.py
+src/nets/versegnet.py
