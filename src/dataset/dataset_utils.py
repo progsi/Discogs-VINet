@@ -48,7 +48,7 @@ def upscale_cqt_values(cqt: np.ndarray) -> np.ndarray:
     return cqt
 
 def normalize_cqt(cqt: np.ndarray) -> np.ndarray:
-    """_summary_
+    """Normalize the CQT spectrogram by dividing by the maximum value.
     Args:
         cqt (np.ndarray): cqt spectrogram
     Returns:

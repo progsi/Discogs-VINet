@@ -18,7 +18,7 @@ from evaluate import evaluate
 from src.dataset import TrainDataset, TestDataset
 from src.utils import load_model, save_model
 from src.utilities.utils import format_time
-from src.losses import init_loss, WeightedMultiloss, requires_cls_labels
+from src.losses import init_loss, WeightedMultiloss
 
 SEED = 27  # License plate code of Gaziantep, gastronomical capital of Türkiye
 
@@ -31,7 +31,6 @@ def train_epoch(
     scheduler: Union[torch.optim.lr_scheduler.LRScheduler, None],
     scaler: Union[torch.cuda.amp.GradScaler, None],  # type: ignore
     device: torch.device,
-    all_labels: torch.Tensor = None,
 ) -> Tuple[float, float, Union[float, None]]:
     """Train the model for one epoch. Return the average loss of the epoch."""
 
@@ -216,13 +215,8 @@ if __name__ == "__main__":
         drop_last=False,
         num_workers=args.num_workers,
     )
-
+    
     loss_func = init_loss(config["TRAIN"]["LOSS"])
-    if requires_cls_labels(loss_func):
-        all_labels = torch.tensor(train_dataset.clique_nums).to(device)
-    else:
-        all_labels = None
-    # init the triplet loss and mining
     
     # Log the initial lr
     if not args.no_wandb:
@@ -249,8 +243,7 @@ if __name__ == "__main__":
             optimizer,
             scheduler,
             scaler=scaler,
-            device=device,
-            all_labels=all_labels,
+            device=device
         )
         t_train = time.monotonic() - t0
         print(f"Average epoch Loss: {train_loss:.6f}, in {format_time(t_train)}")

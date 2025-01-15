@@ -10,8 +10,8 @@ MODEL :
   FREQUENCY_BINS: 84
   SAMPLE_RATE: 22050
   DOWNSAMPLE_FACTOR: 15 # might try out 20?
-  L2_NORMALIZE: True # L2 normalize the embeddings.
-  SIMILARITY_SEARCH: MIPS # ['MCSS', 'NNS', 'MIPS'] If L2_NORMALIZE is True, use 'MIPS' for faster search.
+  L2_NORMALIZE: False # L2 normalize the embeddings.
+  SIMILARITY_SEARCH: MCSS # ['MCSS', 'NNS', 'MIPS'] If L2_NORMALIZE is True, use 'MIPS' for faster search.
   CHECKPOINT_DIR: logs/checkpoints/
   # CONV_CHANNEL: 40
   # NORMALIZATION: bn # ['bn', 'in', 'ibn']
@@ -23,7 +23,7 @@ TRAIN:
     TRAIN_CLIQUES: /data/discogs/Discogs-VI-YT-20240701-light.json.train
     VALIDATION_CLIQUES: /data/discogs/Discogs-VI-YT-20240701-light.json.val
     M_PER_CLASS: 4 # Number of versions per clique during a training iteration.
-    SCALE: normalize # this is done in CoverHunter. Maybe due to Conformer?
+    SCALE: null # ['normalize', 'upscale']
     CONTEXT_LENGTH: 7600 # Number of frames to consider as context, before downsampling.
     BATCH_SIZE: 8 # Number of versions in batch.
     EPOCHS: 200 # Number of epochs to train.
@@ -42,20 +42,17 @@ TRAIN:
       PROTOTYPICAL:
         WEIGHT: 1.0
         N_SUPPORT: 2
-      #SOFTMAX:
-      #  LABEL_SMOOTHING: 0.1
-      FOCAL:
-        WEIGHT: 1.0 # Weight of the loss.
-        GAMMA: 2.0 # Focal loss gamma.
+      SOFTMAX:
+        LABEL_SMOOTHING: 0.1
     OPTIMIZER: Adam # ['Adam', 'AdamW']
-    WEIGHT_DECAY: 0.00001 # Weight decay.
+    WEIGHT_DECAY: 0.00001 
     AUTOMATIC_MIXED_PRECISION: True # Use mixed precision training.
     LR: # see https://github.com/Liu-Feng-deeplearning/CoverHunter/blob/main/egs/covers80/config/hparams.yaml
       SCHEDULE: COSINE # ['NONE', 'STEP', 'MULTISTEP', 'EXPONENTIAL' 'EXPONENTIAL-MIN_LR', 'COSINE, LIN-WARMUP-PCWS'].
       LR: 0.001 
       PARAMS:
-        MIN_LR: 0.0001 # from 
-        T_0: 15_000 # 10 Epochs (approx. the same iterations like in the paper with 40 epochs, but on SHS100K).
+        MIN_LR: 0.0 # from 
+        T_0: 60_000 # 40 Epochs (approx. the same iterations like in the paper with 40 epochs, but on SHS100K).
     CUDA_DETERMINISTIC: False # Set to True for deterministic training.
     CUDA_BENCHMARK: False # Set to True for benchmarking.
     CLIQUE_USAGE_RATIO: 1.0 # Fraction of training data to use. Useful for debugging. 1.0 to use 100% of data.

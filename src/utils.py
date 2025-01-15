@@ -47,6 +47,7 @@ def build_model(config: dict, device: str) -> CQTNet:
             attention_dim=config["MODEL"]["ATTENTION_DIM"],
             num_blocks=config["MODEL"]["NUM_BLOCKS"],
             output_cls=config["MODEL"]["OUTPUT_CLS"],
+            l2_normalize=config["MODEL"]["L2_NORMALIZE"]
         ).to(device)
     elif config["MODEL"]["ARCHITECTURE"].upper() == "LYRACNET":
         model = LyraCNet(

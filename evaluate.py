@@ -65,17 +65,18 @@ def evaluate(
     labels = torch.zeros(N, dtype=torch.int32, device=device)
 
     print("Extracting embeddings...")
-    for idx, (feature, label) in enumerate(loader):
-        assert feature.shape[0] == 1, "Batch size must be 1 for inference."
-        feature = feature.unsqueeze(1).to(device)  # (1,F,T) -> (1,1,F,T)
-        with torch.autocast(device_type=device.type, dtype=torch.float16, enabled=amp):
-            out = model(feature)
-            embedding = out[0]
-            
-        embeddings[idx : idx + 1] = embedding
-        labels[idx : idx + 1] = label.to(device)
-        if (idx + 1) % (len(loader) // 10) == 0 or idx == len(loader) - 1:
-            print(f"[{(idx+1):>{len(str(len(loader)))}}/{len(loader)}]")
+    with torch.no_grad():
+        for idx, (feature, label) in enumerate(loader):
+            assert feature.shape[0] == 1, "Batch size must be 1 for inference."
+            feature = feature.unsqueeze(1).to(device)  # (1,F,T) -> (1,1,F,T)
+            with torch.autocast(device_type=device.type, dtype=torch.float16, enabled=amp):
+                out = model(feature)
+                embedding = out[0]
+                
+            embeddings[idx : idx + 1] = embedding
+            labels[idx : idx + 1] = label.to(device)
+            if (idx + 1) % (len(loader) // 10) == 0 or idx == len(loader) - 1:
+                print(f"[{(idx+1):>{len(str(len(loader)))}}/{len(loader)}]")
     print(f"Extraction time: {format_time(time.monotonic() - t0)}")
 
     # If there are no noise works, remove the cliques with single versions

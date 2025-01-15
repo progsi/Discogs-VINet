@@ -10,8 +10,8 @@ MODEL :
   FREQUENCY_BINS: 84
   SAMPLE_RATE: 22050
   DOWNSAMPLE_FACTOR: 15 # might try out 20?
-  L2_NORMALIZE: True # L2 normalize the embeddings.
-  SIMILARITY_SEARCH: MIPS # ['MCSS', 'NNS', 'MIPS'] If L2_NORMALIZE is True, use 'MIPS' for faster search.
+  L2_NORMALIZE: False # L2 normalize the embeddings.
+  SIMILARITY_SEARCH: MCSS # ['MCSS', 'NNS', 'MIPS'] If L2_NORMALIZE is True, use 'MIPS' for faster search.
   CHECKPOINT_DIR: logs/checkpoints/
   # CONV_CHANNEL: 40
   # NORMALIZATION: bn # ['bn', 'in', 'ibn']
@@ -23,7 +23,7 @@ TRAIN:
     TRAIN_CLIQUES: /data/discogs/Discogs-VI-YT-20240701-light.json.train
     VALIDATION_CLIQUES: /data/discogs/Discogs-VI-YT-20240701-light.json.val
     M_PER_CLASS: 4 # Number of versions per clique during a training iteration.
-    SCALE: normalize # ['normalize', 'upscale']
+    SCALE: null # ['normalize', 'upscale']
     CONTEXT_LENGTH: 7600 # Number of frames to consider as context, before downsampling.
     BATCH_SIZE: 216 # Number of versions in batch.
     EPOCHS: 200 # Number of epochs to train.
