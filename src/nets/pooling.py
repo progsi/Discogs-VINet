@@ -228,6 +228,8 @@ class IBN(nn.Module):
 
 
 class GeM(nn.Module):
+    """Generalized Mean Pooling.
+    """
     def __init__(self, p=torch.log(torch.tensor(3)), eps=1e-6):
         super(GeM, self).__init__()
         self.p = nn.Parameter(torch.ones(1) * p)

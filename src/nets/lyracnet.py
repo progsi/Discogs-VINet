@@ -40,16 +40,16 @@ class BasicBlock(nn.Module):
         
 
 class NetworkBlock(nn.Module):
-    def __init__(self, nb_layers, in_planes, out_planes, block, stride, dropout=0.0,
+    def __init__(self, num_layers, in_planes, out_planes, block, stride, dropout=0.0,
                  activate_before_residual=False):
         super(NetworkBlock, self).__init__()
         self.layer = self._make_layer(
-            block, in_planes, out_planes, nb_layers, stride, dropout, activate_before_residual)
+            block, in_planes, out_planes, num_layers, stride, dropout, activate_before_residual)
 
-    def _make_layer(self, block, in_planes, out_planes, nb_layers, stride, dropout,
+    def _make_layer(self, block, in_planes, out_planes, num_layers, stride, dropout,
                     activate_before_residual):
         layers = []
-        for i in range(int(nb_layers)):
+        for i in range(int(num_layers)):
             layers.append(block(i == 0 and in_planes or out_planes, out_planes,
                                 i == 0 and stride or 1, dropout, activate_before_residual))
         return nn.Sequential(*layers)
@@ -59,7 +59,8 @@ class NetworkBlock(nn.Module):
     
 
 class LyraCNet(nn.Module):
-    def __init__(self, depth, embed_dim, num_blocks, widen_factor, num_classes, dropout=0.0, dense_dropout=0.0):
+    def __init__(self, depth, embed_dim, num_blocks, widen_factor, num_classes, 
+                 dropout=0.0, dense_dropout=0.0):
         super(LyraCNet, self).__init__()
         
         self.num_blocks = num_blocks
@@ -81,8 +82,8 @@ class LyraCNet(nn.Module):
         self.blocks = nn.ModuleList()
         for i in range(num_blocks):
             activate_before = i == 0 # only for first block
-            stride = 1 if i == 0 else 2
-            self.blocks.append(NetworkBlock(n, nChannels[i], nChannels[i + 1], block, stride, dropout, activate_before))
+            # stride = 1 if i == 0 else 2
+            self.blocks.append(NetworkBlock(n, nChannels[i], nChannels[i + 1], block, 2, dropout, activate_before))
         
         # global average pooling and classifier
         self.bn1 = nn.BatchNorm2d(nChannels[-1], momentum=0.001)

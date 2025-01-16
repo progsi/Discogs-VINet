@@ -8,6 +8,7 @@ from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from src.nets.cqtnet import CQTNet
 from src.nets.coverhunter import CoverHunter
 from src.nets.lyracnet import LyraCNet
+from src.nets.versegnet import VerSegNet
 from src.lr_schedulers import (
     CosineAnnealingWarmRestartsWithWarmup,
     WarmupPiecewiseConstantScheduler,
@@ -58,6 +59,21 @@ def build_model(config: dict, device: str) -> CQTNet:
             widen_factor=config["MODEL"]["WIDEN_FACTOR"],
             num_classes=config["MODEL"]["OUTPUT_CLS"],
             ).to(device)
+    elif config["MODEL"]["ARCHITECTURE"].upper() == "VERSEGNET":
+        model = VerSegNet(
+            depth=config["MODEL"]["DEPTH"], 
+            embed_dim=config["MODEL"]["EMBEDDING_SIZE"], 
+            num_blocks=config["MODEL"]["NUM_BLOCKS"],
+            widen_factor=config["MODEL"]["WIDEN_FACTOR"],
+            num_classes=config["MODEL"]["OUTPUT_CLS"],
+            num_attns=config["MODEL"]["NUM_ATTNS"],
+            n_units=config["MODEL"]["N_UNITS"],
+            n_heads=config["MODEL"]["N_HEADS"],
+            max_len=config["MODEL"]["MAX_LEN"],
+            cnn_dropout=config["MODEL"]["CNN_DROPOUT"],
+            attn_dropout=config["MODEL"]["ATTN_DROPOUT"],
+            return_maps=config["MODEL"]["RETURN_MAPS"],
+            ).to(device)      
     else:
         raise ValueError("Model architecture not recognized.")
     _, _ = count_model_parameters(model)
@@ -128,7 +144,8 @@ def load_model(config: dict, device: str, mode="train"):
             
         if "PARAMS" in config["TRAIN"]["LR"]:
             lr_params = {
-                k.lower(): v for k, v in config["TRAIN"]["LR"]["PARAMS"].items()
+                (k.lower() if not k.startswith("T_") else k): v
+                for k, v in config["TRAIN"]["LR"]["PARAMS"].items()
             }
         if config["TRAIN"]["LR"]["SCHEDULE"].upper() == "STEP":
             scheduler = torch.optim.lr_scheduler.StepLR(optimizer, **lr_params)
@@ -155,6 +172,7 @@ def load_model(config: dict, device: str, mode="train"):
                 **lr_params,
             )
         elif config["TRAIN"]["LR"]["SCHEDULE"].upper() == "COSINE":
+
             scheduler = CosineAnnealingWarmRestarts(
                 optimizer,
                 **lr_params,

@@ -3,7 +3,7 @@ MODEL :
   # Model
   ARCHITECTURE: lyracnet
   EMBEDDING_SIZE: 1024 # in paper: either 128 or 256
-  DEPTH: 16 
+  DEPTH: 28 
   NUM_BLOCKS: 4
   WIDEN_FACTOR: 8
   OUTPUT_CLS: 76_775 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.
@@ -51,7 +51,6 @@ TRAIN:
       SCHEDULE: COSINE # ['NONE', 'STEP', 'MULTISTEP', 'EXPONENTIAL' 'EXPONENTIAL-MIN_LR', 'COSINE, LIN-WARMUP-PCWS'].
       LR: 0.001 
       PARAMS:
-        MIN_LR: 0.0 # from 
         T_0: 60_000 # 40 Epochs (approx. the same iterations like in the paper with 40 epochs, but on SHS100K).
     CUDA_DETERMINISTIC: False # Set to True for deterministic training.
     CUDA_BENCHMARK: False # Set to True for benchmarking.
