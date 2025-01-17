@@ -108,12 +108,14 @@ class LyraCNet(nn.Module):
     def forward(self, x):
         # Input shape: [B, 1, F, T]
         x = self.conv1(x)
+        
         for block in self.blocks:
             x = block(x)
-        x = self.relu(self.bn1(x)) # this needed?
-        # x = F.avg_pool2d(x, 8) replaced by GeM
+        x = self.relu(self.bn1(x)) 
+
         x = self.pooling(x)
         x = x.view(-1, self.nChannels)
+
         y1 = self.fc1(x) # for prototypical loss
         y2 = self.fc1(y1) # for triplet + center loss
         y3 = self.fc3(y2) # for classification loss

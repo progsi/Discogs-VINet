@@ -2,7 +2,7 @@ MODEL :
   NAME: berlin
   # Model
   ARCHITECTURE: lyracnet
-  EMBEDDING_SIZE: 1024 # in paper: either 128 or 256
+  EMBEDDING_SIZE: 1024 
   DEPTH: 28 
   NUM_BLOCKS: 4
   WIDEN_FACTOR: 8
