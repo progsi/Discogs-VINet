@@ -3,7 +3,7 @@ MODEL :
   # Model
   ARCHITECTURE: lyracnet
   EMBEDDING_SIZE: 1024 # in paper: either 128 or 256
-  DEPTH: 16 
+  DEPTH: 28 
   NUM_BLOCKS: 4
   WIDEN_FACTOR: 8
   OUTPUT_CLS: 76_775 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.
