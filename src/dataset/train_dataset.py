@@ -27,6 +27,7 @@ class TrainDataset(BaseDataset):
         cqt_bins: int = 84,
         scale: str = "norm",
         clique_usage_ratio: float = 1.0,
+        transform=None,
     ) -> None:
         """Initializes the training dataset.
 
@@ -49,6 +50,8 @@ class TrainDataset(BaseDataset):
         clique_usage_ratio: float
             Ratio of the cliques to use. If < 1.0, it will reduce the number of cliques.
             Usefull for debugging, short tests.
+        transform : callable (optional)
+            Augmentation pipeline.
         """
 
         assert context_length > 0, f"Expected context_length > 0, got {context_length}"
@@ -110,6 +113,8 @@ class TrainDataset(BaseDataset):
                 self.clique_ids.append(clique_id)
                 self.labels.append(i)
                 self.versions.append(version)
+        
+        self.transform = transform
      
     def __getitem__(self, index) -> Tuple[torch.Tensor, list]:
         """Get self.samples_per_clique random anchor versions from a given clique.
@@ -131,6 +136,9 @@ class TrainDataset(BaseDataset):
         # Get feature
         version = self.versions[index]
         feature = self.load_cqt(version["youtube_id"])
+        
+        if self.transform:
+            feature = self.transform(feature)
 
         return feature, label
 

@@ -27,6 +27,14 @@ TRAIN:
     CONTEXT_LENGTH: 7600 # Number of frames to consider as context, before downsampling.
     BATCH_SIZE: 256 # Number of versions in batch.
     EPOCHS: 200 # Number of epochs to train.
+    AUGMENTATION:
+      T: 40 # maximum time mask
+      F: 30 # maximum frequency mask
+      NUM_TIME_MASKS: 2
+      NUM_FREQ_MASKS: 2
+      NOISE_STD: 0.01
+      P_NOISE: 0.5
+      REPLACE_WITH_ZERO: False
     LOSS:
       TRIPLET:
         WEIGHT: 1 # Weight of the loss.

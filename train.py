@@ -19,6 +19,7 @@ from src.dataset import TrainDataset, TestDataset
 from src.utils import load_model, save_model
 from src.utilities.utils import format_time
 from src.losses import init_loss, WeightedMultiloss
+from src.dataset.augmentation import SpecAug
 
 SEED = 27  # License plate code of Gaziantep, gastronomical capital of Türkiye
 
@@ -178,13 +179,28 @@ if __name__ == "__main__":
     date_time = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
     print("Creating the dataset...")
+    # augmentation:
+    if config["TRAIN"]["AUGMENTATION"] is not None:
+        transform = SpecAug(
+            T=config["TRAIN"]["AUGMENTATION"]["T"],
+            F=config["TRAIN"]["AUGMENTATION"]["F"],
+            num_time_masks=config["TRAIN"]["AUGMENTATION"]["NUM_TIME_MASKS"],
+            num_freq_masks=config["TRAIN"]["AUGMENTATION"]["NUM_FREQ_MASKS"],
+            noise_std=config["TRAIN"]["AUGMENTATION"]["NOISE_STD"],
+            p_noise=config["TRAIN"]["AUGMENTATION"]["P_NOISE"],
+            replace_with_zero=config["TRAIN"]["AUGMENTATION"]["REPLACE_WITH_ZERO"]
+        )
+    else:
+        transform = None
+    
     train_dataset = TrainDataset(
         config["TRAIN"]["TRAIN_CLIQUES"],
         config["TRAIN"]["FEATURES_DIR"],
         context_length=config["TRAIN"]["CONTEXT_LENGTH"],
         mean_downsample_factor=config["MODEL"]["DOWNSAMPLE_FACTOR"],
         clique_usage_ratio=config["TRAIN"]["CLIQUE_USAGE_RATIO"],
-        scale=config["TRAIN"]["SCALE"]
+        scale=config["TRAIN"]["SCALE"],
+        transform=transform
     )
     
     sampler = samplers.MPerClassSampler(train_dataset.labels,

@@ -1,6 +1,5 @@
 import numpy as np
 
-
 def mean_downsample_cqt(cqt: np.ndarray, mean_window_length: int) -> np.ndarray:
     """Downsamples the CQT by taking the mean of every `mean_window_length` frames without
     overlapping. Adapted from https://github.com/yzspku/TPPNet/blob/master/data/gencqt.py
