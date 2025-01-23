@@ -1,6 +1,7 @@
 import json
 import pathlib
 from typing import Tuple
+import random
 
 import numpy as np
 import torch
@@ -22,7 +23,8 @@ class TrainDataset(BaseDataset):
         self,
         cliques_json_path: str,
         features_dir: str,
-        context_length: int,
+        max_length: int,
+        min_length: int = None,
         mean_downsample_factor: int = 20,
         cqt_bins: int = 84,
         scale: str = "norm",
@@ -37,9 +39,10 @@ class TrainDataset(BaseDataset):
             Path to the cliques json file
         features_dir : str
             Path to the directory containing the features
-        context_length : int
-            Length of the context before downsampling. If a feature is longer than this,
-            a chunk of this length is taken randomly. If a feature is shorter, it is padded.
+        max_length : int
+            Maximum length before downsampling. If a feature is longer than this, it is randomly cropped.
+        min_length : int (optional)
+            Minimum length of the context before downsampling. If a feature is shorter than this, its padded.
         mean_downsample_factor : int
             Factor by which to downsample the features by averaging
         cqt_bins : int
@@ -54,7 +57,7 @@ class TrainDataset(BaseDataset):
             Augmentation pipeline.
         """
 
-        assert context_length > 0, f"Expected context_length > 0, got {context_length}"
+        assert max_length > 0, f"Expected max_length > 0, got {max_length}"
         assert (
             mean_downsample_factor > 0
         ), f"Expected mean_downsample_factor > 0, got {mean_downsample_factor}"
@@ -63,7 +66,12 @@ class TrainDataset(BaseDataset):
 
         self.cliques_json_path = cliques_json_path
         self.features_dir = pathlib.Path(features_dir)
-        self.context_length = context_length
+        self.max_length = max_length
+        if min_length:
+            self.min_length = min_length
+        else:
+            self.min_length = self.max_length
+            
         self.mean_downsample_factor = mean_downsample_factor
         self.scale = scale
         self.cqt_bins = cqt_bins
@@ -176,14 +184,15 @@ class TrainDataset(BaseDataset):
         feature_shape = tuple(np.load(feature_shape_path, mmap_mode="r"))
 
         # Load the magnitude CQT
-        if feature_shape[0] > self.context_length:
+        length = random.randint(self.min_length, self.max_length)
+        if feature_shape[0] > length:
             # If the feature is long enough, take a random chunk
-            start = np.random.randint(0, feature_shape[0] - self.context_length)
+            start = np.random.randint(0, feature_shape[0] - length)
             fp = np.memmap(
                 feature_path,
                 dtype="float16",
                 mode="r",
-                shape=(self.context_length, feature_shape[1]),
+                shape=(length, feature_shape[1]),
                 offset=start * feature_shape[1] * 2,  # 2 bytes per float16
             )
         else:
@@ -205,10 +214,10 @@ class TrainDataset(BaseDataset):
         ), f"Expected {self.cqt_bins} features, got {feature.shape[1]}"
 
         # Pad the feature if it is too short
-        if feature.shape[0] < self.context_length:
+        if feature.shape[0] < length:
             feature = np.pad(
                 feature,
-                ((0, self.context_length - feature_shape[0]), (0, 0)),
+                ((0, length - feature_shape[0]), (0, 0)),
                 mode="constant",
                 constant_values=0,
             )
@@ -247,7 +256,7 @@ class TrainDataset(BaseDataset):
         features: torch.Tensor
             The CQT features of the anchors, shape=(B, F, T), dtype=float32
             F is the number of CQT bins.
-            T is the downsampled context_length,
+            T is the downsampled max_length,
         labels: torch.Tensor
             1D tensor of the clique labels, shape=(B,)
         """

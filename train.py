@@ -196,7 +196,7 @@ if __name__ == "__main__":
     train_dataset = TrainDataset(
         config["TRAIN"]["TRAIN_CLIQUES"],
         config["TRAIN"]["FEATURES_DIR"],
-        context_length=config["TRAIN"]["CONTEXT_LENGTH"],
+        max_length=config["TRAIN"]["MAX_LENGTH"],
         mean_downsample_factor=config["MODEL"]["DOWNSAMPLE_FACTOR"],
         clique_usage_ratio=config["TRAIN"]["CLIQUE_USAGE_RATIO"],
         scale=config["TRAIN"]["SCALE"],

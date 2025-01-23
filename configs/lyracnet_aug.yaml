@@ -24,7 +24,8 @@ TRAIN:
     VALIDATION_CLIQUES: /data/discogs/Discogs-VI-YT-20240701-light.json.val
     M_PER_CLASS: 4 # Number of versions per clique during a training iteration.
     SCALE: null # ['normalize', 'upscale']
-    CONTEXT_LENGTH: 7600 # Number of frames to consider as context, before downsampling.
+    MAX_LENGTH: 7750 # 180 seconds are 7752.6 frames
+    MIN_LENGTH: 4300 # 100 seconds are 4307 frames
     BATCH_SIZE: 216 # Number of versions in batch.
     EPOCHS: 200 # Number of epochs to train.
     AUGMENTATION:
