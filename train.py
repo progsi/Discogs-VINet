@@ -197,6 +197,7 @@ if __name__ == "__main__":
         config["TRAIN"]["TRAIN_CLIQUES"],
         config["TRAIN"]["FEATURES_DIR"],
         max_length=config["TRAIN"]["MAX_LENGTH"],
+        min_length=config["TRAIN"]["MIN_LENGTH"] if config["TRAIN"]["MIN_LENGTH"] > 0 else None,
         mean_downsample_factor=config["MODEL"]["DOWNSAMPLE_FACTOR"],
         clique_usage_ratio=config["TRAIN"]["CLIQUE_USAGE_RATIO"],
         scale=config["TRAIN"]["SCALE"],

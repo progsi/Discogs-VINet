@@ -260,8 +260,14 @@ class TrainDataset(BaseDataset):
         labels: torch.Tensor
             1D tensor of the clique labels, shape=(B,)
         """
-
-        features = torch.stack([item[0] for item in items])
+        
+        # padding
+        max_length = max(item[0].shape[1] for item in items)
+        padded_features = [
+            torch.nn.functional.pad(item[0], (0, max_length - item[0].shape[1])) for item in items
+        ]
+        
+        features = torch.stack(padded_features)
         labels = torch.tensor([item[1] for item in items])
 
         return features, labels
