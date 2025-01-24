@@ -116,9 +116,9 @@ class LyraCNet(nn.Module):
         x = self.pooling(x)
         x = x.view(-1, self.nChannels)
 
-        y1 = self.fc1(x) # for prototypical loss
-        y2 = self.fc1(y1) # for triplet + center loss
-        y3 = self.fc3(y2) # for classification loss
-        return y1, y2, y3
+        y_pnl = self.fc1(x) # for prototypical loss
+        y_emb = self.fc1(y1) # for triplet + center loss
+        y_cls = self.fc3(y2) # for classification loss
+        return y_emb, y_pnl, y_cls
         
         
