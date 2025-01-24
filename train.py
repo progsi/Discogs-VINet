@@ -55,7 +55,7 @@ def train_epoch(
                 embeddings, y = out
                 loss = loss_func(embeddings, labels, y)
             elif len(out) == 3: # 2 embeddings + classification
-                embeddings2, embeddings1, y = out
+                embeddings1, embeddings2, y = out
                 loss = loss_func(
                     embs=embeddings1, 
                     labels=labels, 
