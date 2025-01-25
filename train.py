@@ -171,7 +171,7 @@ if __name__ == "__main__":
 
     print("Creating the dataset...")
     # augmentation:
-    if config["TRAIN"]["AUGMENTATION"] is not None:
+    if config["TRAIN"].get("AUGMENTATION"):
         transform = SpecAug(
             T=config["TRAIN"]["AUGMENTATION"]["T"],
             F=config["TRAIN"]["AUGMENTATION"]["F"],
@@ -188,7 +188,7 @@ if __name__ == "__main__":
         config["TRAIN"]["TRAIN_CLIQUES"],
         config["TRAIN"]["FEATURES_DIR"],
         max_length=config["TRAIN"]["MAX_LENGTH"],
-        min_length=config["TRAIN"]["MIN_LENGTH"] if config["TRAIN"]["MIN_LENGTH"] > 0 else None,
+        min_length=config["TRAIN"].get("MIN_LENGTH"),
         mean_downsample_factor=config["MODEL"]["DOWNSAMPLE_FACTOR"],
         clique_usage_ratio=config["TRAIN"]["CLIQUE_USAGE_RATIO"],
         scale=config["TRAIN"]["SCALE"],
