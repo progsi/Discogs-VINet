@@ -116,8 +116,11 @@ class LyraCNet(nn.Module):
         x = self.pooling(x)
         x = x.view(-1, self.nChannels)
 
+        # TODO: check options: 
+        # 1. Third FC Layer with embedding output + fourth for classification
+        # 2. Only one FC layer
         x_pnl = self.fc1(x) # for prototypical loss
-        x_emb = self.fc1(x_pnl) # for triplet + center loss
+        x_emb = self.fc2(x_pnl) # for triplet + center loss
         x_cls = self.fc3(x_emb) # for classification loss
         return x_emb, x_pnl, x_cls
         
