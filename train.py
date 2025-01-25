@@ -46,21 +46,12 @@ def train_epoch(
         
         with torch.autocast(device_type=device.type, dtype=torch.float16, enabled=amp):
             
-            out = model(features)
+            _, preds = model(features)
             
-            if len(out) == 1: # only embedding
-                embeddings = out
-                loss = loss_func(embeddings, labels)
-            elif len(out) == 2: # embedding + classification
-                embeddings, y = out
-                loss = loss_func(embeddings, labels, y)
-            elif len(out) == 3: # 2 embeddings + classification
-                embeddings1, embeddings2, y = out
-                loss = loss_func(
-                    embs=embeddings1, 
-                    labels=labels, 
-                    cls_preds=y, 
-                    embs2=embeddings2)
+            if isinstance(loss_func, WeightedMultiloss):
+                loss = loss_func(preds, labels)
+            else:
+                loss = loss_func(preds["inference"], labels)
                 
         if amp:
             scaler.scale(loss).backward()  # type: ignore

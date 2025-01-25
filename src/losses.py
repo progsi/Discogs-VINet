@@ -1,11 +1,15 @@
-from typing import List, Type, Tuple, Union
+from typing import List, Dict, Type, Tuple, Union
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from pytorch_metric_learning import losses, miners
 from src.utilities.tensor_op import pairwise_distance_matrix, create_pos_neg_masks
 
+TRIPLET_LOSS = 'triplet'
+CENTER_LOSS = 'center'
+SOFTMAX_LOSS = 'softmax'
+PROTOTYPICAL_LOSS = 'prototypical'
+FOCAL_LOSS = 'focal'
 
 def init_single_loss(loss_name: str, loss_params: dict) -> Type[nn.Module]:
     """Initialize a single loss function.
@@ -18,17 +22,17 @@ def init_single_loss(loss_name: str, loss_params: dict) -> Type[nn.Module]:
     print(f"Initializing {loss_name} loss with parameters:")
     for key, value in loss_params.items():
         print(f"    {key.lower()}: {value}")
-    if loss_name == 'TRIPLET':
+    if loss_name == TRIPLET_LOSS.upper():
         return TripletMarginLoss(margin=loss_params['MARGIN'], 
                                  positive_mining=loss_params['POSITIVE_MINING'],
                                  negative_mining=loss_params['NEGATIVE_MINING'])
-    elif loss_name == 'CENTER':
+    elif loss_name == CENTER_LOSS.upper():
         return CenterLoss(num_cls=loss_params['NUM_CLS'], feat_dim=loss_params['FEAT_DIM'])
-    elif loss_name == 'FOCAL':
+    elif loss_name == FOCAL_LOSS.upper():
         return FocalLoss(gamma=loss_params['GAMMA'])
-    elif loss_name == 'SOFTMAX':
+    elif loss_name == SOFTMAX_LOSS.upper():
         return nn.CrossEntropyLoss(label_smoothing=loss_params['LABEL_SMOOTHING'])
-    elif loss_name == 'PROTOTYPICAL':
+    elif loss_name == PROTOTYPICAL_LOSS.upper():
         return PrototypicalLoss(n_support=loss_params['N_SUPPORT'])
 
 def init_loss(loss_config: dict) -> Type[nn.Module]:
@@ -80,30 +84,21 @@ class WeightedMultiloss(nn.Module):
             is_cls = is_cls_loss(loss_name)
             self.losses_with_weights.append((loss_name, loss_fn, weight, is_cls))
             self.loss_stats[loss_name] = {}
-        
-    def forward(self, 
-                embs: torch.Tensor, 
-                labels: torch.Tensor, 
-                cls_preds: torch.Tensor, 
-                embs2: torch.Tensor = None,                 
-                ) -> torch.Tensor:
-        """Calculates the Multiloss and returns individual losses.
+    
+    def forward(self, preds: Dict[str, torch.Tensor], labels: torch.Tensor) -> torch.Tensor:
+        """Calculates Multiloss.
         Args:
-            embs (torch.Tensor): embeddings
-            labels (torch.Tensor): class labels per embedding
-            cls_preds (torch.Tensor): output after BNN
-            embs2: torch.Tensor = None: more embeddings (eg. in case of LyraCNet). Should be used for Prototypical Loss.                 
+            preds (Dict[str, torch.Tensor]): Mapping of loss names to predictions (embeddings or cls) per loss
+            labels (torch.Tensor): Target labels.
         Returns:
-            tuple: Total loss and a dictionary of individual losses.
+            torch.Tensor: total loss
         """
+        
         total_loss = 0
         
         for loss_name, loss_fn, weight, is_cls in self.losses_with_weights:
-            # prototypical loss requires different embeddings
-            if loss_name == 'PROTOTYPICAL' and embs2 is not None:
-                x = embs2
-            else:
-                x = cls_preds if is_cls else embs
+
+            x = preds[loss_name.lower()] 
             
             # compute and weigh
             loss = loss_fn(x, labels)
@@ -502,22 +497,22 @@ class CenterLoss(nn.Module):
 
         self.centers = nn.Parameter(torch.randn(self.num_cls, self.feat_dim).to(self.device))
 
-    def forward(self, x_emb: torch.tensor, y_cls: torch.tensor) -> torch.tensor:
+    def forward(self, embeddings: torch.tensor, labels: torch.tensor) -> torch.tensor:
         """Compute loss.
         Args:
-            x_emb (torch.tensor): embeddings
-            y_cls (torch.tensor): class labels
+            embeddings (torch.tensor): embeddings
+            labels (torch.tensor): class labels
         Returns:
             torch.tensor: loss
         """
-        N = x_emb.size(0)
-        distmat = torch.pow(x_emb, 2).sum(dim=1, keepdim=True).expand(N, self.num_cls) + \
+        N = embeddings.size(0)
+        distmat = torch.pow(embeddings, 2).sum(dim=1, keepdim=True).expand(N, self.num_cls) + \
                   torch.pow(self.centers, 2).sum(dim=1, keepdim=True).expand(self.num_cls, N).t()
-        distmat.to(x_emb.dtype).addmm_(x_emb, self.centers.to(x_emb.dtype).t(), beta=1, alpha=-2)
+        distmat.to(embeddings.dtype).addmm_(embeddings, self.centers.to(embeddings.dtype).t(), beta=1, alpha=-2)
 
         classes = torch.arange(self.num_cls).long().to(self.device)
-        y_cls = y_cls.unsqueeze(1).expand(N, self.num_cls)
-        mask = y_cls.eq(classes.expand(N, self.num_cls))
+        labels = labels.unsqueeze(1).expand(N, self.num_cls)
+        mask = labels.eq(classes.expand(N, self.num_cls))
 
         dist = distmat * mask.float()
         loss = dist.clamp(min=1e-12, max=1e+12).sum() / N
@@ -534,7 +529,7 @@ class PrototypicalLoss(torch.nn.Module):
         super(PrototypicalLoss, self).__init__()
         self.n_support = n_support
 
-    def forward(self, x_emb, y_cls):
+    def forward(self, embeddings, labels):
         '''
         Compute the barycentres by averaging the features of n_support
         samples for each class in target, computes then the distances from each
@@ -543,32 +538,32 @@ class PrototypicalLoss(torch.nn.Module):
         classes, of appartaining to a class c, loss and accuracy are then computed
         and returned
         Args:
-        - x_emb: the model output for a batch of samples
-        - y_cls: ground truth for the above batch of samples
+        - embeddings: the model output for a batch of samples
+        - labels: ground truth for the above batch of samples
         '''
         def supp_idxs(c):
             # FIXME when torch will support where as np
-            return y_cls.eq(c).nonzero()[:self.n_support].squeeze(1)
+            return labels.eq(c).nonzero()[:self.n_support].squeeze(1)
 
         # FIXME when torch.unique will be available on cuda too
-        classes = torch.unique(y_cls)
+        classes = torch.unique(labels)
         n_classes = len(classes)
         # FIXME when torch will support where as np
         # assuming n_query, n_target constants
-        n_query = y_cls.eq(classes[0].item()).sum().item() - self.n_support
+        n_query = labels.eq(classes[0].item()).sum().item() - self.n_support
 
         support_idxs = list(map(supp_idxs, classes))
 
-        prototypes = torch.stack([x_emb[idx_list].mean(0) for idx_list in support_idxs])
+        prototypes = torch.stack([embeddings[idx_list].mean(0) for idx_list in support_idxs])
         # FIXME when torch will support where as np
-        query_idxs = torch.stack(list(map(lambda c: y_cls.eq(c).nonzero()[self.n_support:], classes))).view(-1)
+        query_idxs = torch.stack(list(map(lambda c: labels.eq(c).nonzero()[self.n_support:], classes))).view(-1)
 
-        query_samples = x_emb[query_idxs]
+        query_samples = embeddings[query_idxs]
         dists = pairwise_distance_matrix(query_samples, prototypes)
 
         log_p_y = F.log_softmax(-dists, dim=1).view(n_classes, n_query, -1)
 
-        target_inds = torch.arange(0, n_classes).to(y_cls.device)
+        target_inds = torch.arange(0, n_classes).to(labels.device)
         target_inds = target_inds.view(n_classes, 1, 1)
         target_inds = target_inds.expand(n_classes, n_query, 1).long()
 

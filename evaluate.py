@@ -69,8 +69,7 @@ def evaluate(
         assert feature.shape[0] == 1, "Batch size must be 1 for inference."
         feature = feature.unsqueeze(1).to(device)  # (1,F,T) -> (1,1,F,T)
         with torch.autocast(device_type=device.type, dtype=torch.float16, enabled=amp):
-            out = model(feature)
-            embedding = out[0]
+            embedding, _ = model(feature)
             
         embeddings[idx : idx + 1] = embedding
         labels[idx : idx + 1] = label.to(device)

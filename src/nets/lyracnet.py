@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from src.nets.pooling import GeM, IBN
-
+from src.losses import TRIPLET_LOSS, CENTER_LOSS, PROTOTYPICAL_LOSS, SOFTMAX_LOSS
 
 class BasicBlock(nn.Module):
     def __init__(self, in_planes, out_planes, stride, dropout=0.0, activate_before_residual=False):
@@ -92,7 +92,8 @@ class LyraCNet(nn.Module):
         self.pooling = GeM()
         self.fc1 = nn.Linear(nChannels[-1], embed_dim)
         self.fc2 = nn.Linear(embed_dim, embed_dim)
-        self.fc3 = nn.Linear(embed_dim, num_classes)
+        self.fc3 = nn.Linear(embed_dim, embed_dim)
+        self.cls = nn.Linear(embed_dim, num_classes) # TODO: batchnorm?
         self.nChannels = nChannels[-1]
 
         for m in self.modules():
@@ -116,12 +117,14 @@ class LyraCNet(nn.Module):
         x = self.pooling(x)
         x = x.view(-1, self.nChannels)
 
-        # TODO: check options: 
-        # 1. Third FC Layer with embedding output + fourth for classification
-        # 2. Only one FC layer
-        x_pnl = self.fc1(x) # for prototypical loss
-        x_emb = self.fc2(x_pnl) # for triplet + center loss
-        x_cls = self.fc3(x_emb) # for classification loss
-        return x_emb, x_pnl, x_cls
-        
+        f_p = self.fc1(x) # for prototypical loss
+        f_t = self.fc2(f_p) # for triplet + center loss
+        f = self.fc3(f_t) # inference embedding
+        cls = self.cls(f) # for classification loss
+        return f, {
+            PROTOTYPICAL_LOSS: f_p,
+            TRIPLET_LOSS: f_t,
+            CENTER_LOSS: f_t,
+            SOFTMAX_LOSS: cls
+        }
         
