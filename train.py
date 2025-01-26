@@ -172,15 +172,8 @@ if __name__ == "__main__":
     print("Creating the dataset...")
     # augmentation:
     if config["TRAIN"].get("AUGMENTATION"):
-        transform = SpecAug(
-            T=config["TRAIN"]["AUGMENTATION"]["T"],
-            F=config["TRAIN"]["AUGMENTATION"]["F"],
-            num_time_masks=config["TRAIN"]["AUGMENTATION"]["NUM_TIME_MASKS"],
-            num_freq_masks=config["TRAIN"]["AUGMENTATION"]["NUM_FREQ_MASKS"],
-            noise_std=config["TRAIN"]["AUGMENTATION"]["NOISE_STD"],
-            p_noise=config["TRAIN"]["AUGMENTATION"]["P_NOISE"],
-            replace_with_zero=config["TRAIN"]["AUGMENTATION"]["REPLACE_WITH_ZERO"]
-        )
+        params = {k.lower() if len(k) > 1 else k: v for k, v in config["TRAIN"]["AUGMENTATION"].items()}
+        transform = SpecAug(**params)
     else:
         transform = None
     
