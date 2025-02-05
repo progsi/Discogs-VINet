@@ -180,7 +180,7 @@ def load_model(config: dict, device: str, mode="train"):
         elif config["TRAIN"]["LR"]["SCHEDULE"].upper() == "LIN-WARMUP-PCWS":
             scheduler = WarmupPiecewiseConstantScheduler(
                 optimizer,
-                min_lr=config["TRAIN"]["LR"]["LR"],
+                eta_min=config["TRAIN"]["LR"]["LR"],
                 **lr_params,
             )
         else:

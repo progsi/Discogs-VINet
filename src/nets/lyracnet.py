@@ -89,11 +89,14 @@ class LyraCNet(nn.Module):
         self.bn1 = nn.BatchNorm2d(nChannels[-1], momentum=0.001)
         self.relu = nn.LeakyReLU(negative_slope=0.1, inplace=True)
         self.drop = nn.Dropout(dense_dropout)        
-        self.pooling = GeM()
+        self.pooling = GeM() # flattening necessary?
+        
         self.fc1 = nn.Linear(nChannels[-1], embed_dim)
-        self.fc2 = nn.Linear(embed_dim, embed_dim)
-        self.fc3 = nn.Linear(embed_dim, embed_dim)
-        self.cls = nn.Linear(embed_dim, num_classes) # TODO: batchnorm?
+        self.fc2 = nn.Linear(embed_dim, embed_dim, bias=False)
+        self.fc3 = nn.Linear(embed_dim, embed_dim, bias=False)
+        # TODO: might need batch norm. here?
+        
+        self.cls = nn.Linear(embed_dim, num_classes, bias=False)
         self.nChannels = nChannels[-1]
 
         for m in self.modules():
@@ -104,7 +107,8 @@ class LyraCNet(nn.Module):
                 nn.init.constant_(m.bias, 0.0)
             elif isinstance(m, nn.Linear):
                 nn.init.xavier_normal_(m.weight)
-                nn.init.constant_(m.bias, 0.0)
+                if m.bias is not None: # necessary, due to non-bias FC layers
+                    nn.init.constant_(m.bias, 0.0)
     
     def forward(self, x):
         # Input shape: [B, 1, F, T]
@@ -112,14 +116,15 @@ class LyraCNet(nn.Module):
         
         for block in self.blocks:
             x = block(x)
-        x = self.relu(self.bn1(x)) 
-
+        x = self.bn1(x)
+        x = self.relu(x) 
         x = self.pooling(x)
         x = x.view(-1, self.nChannels)
 
         f_p = self.fc1(x) # for prototypical loss
         f_t = self.fc2(f_p) # for triplet + center loss
-        f = self.fc3(f_t) # inference embedding
+        f   = self.fc3(f_t) # inference embedding
+
         cls = self.cls(f) # for classification loss
         return f, {
             PROTOTYPICAL_LOSS: f_p,
