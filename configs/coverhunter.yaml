@@ -1,5 +1,5 @@
 MODEL :
-  NAME: berlin
+  NAME: CoverHunter
   # Model
   ARCHITECTURE: coverhunter
   EMBEDDING_SIZE: 128 # in paper: either 128 or 256

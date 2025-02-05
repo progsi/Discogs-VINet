@@ -5,7 +5,7 @@ MODEL :
   EMBEDDING_SIZE: 512
   NORMALIZATION: bn # ['bn', 'in', 'ibn']
   POOLING: adaptive_max # ['adaptive_max', 'gem', 'softpool']
-  NECK: linear # ['none', 'linear', 'affine', 'mlp', 'bnneck']
+  NECK: bnneck # ['none', 'linear', 'affine', 'mlp', 'bnneck']
   L2_NORMALIZE: True # L2 normalize the embeddings.
   SIMILARITY_SEARCH: MIPS # ['MCSS', 'NNS', 'MIPS'] If L2_NORMALIZE is True, use 'MIPS' for faster search.
   DOWNSAMPLE_FACTOR: 20 # Downsampling factor.

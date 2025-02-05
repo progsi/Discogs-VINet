@@ -1,11 +1,11 @@
 MODEL :
-  NAME: Discogs-VINet
+  NAME: Discogs-BNNeck-Debug
   ARCHITECTURE: cqtnet
   CONV_CHANNEL: 40
   EMBEDDING_SIZE: 512
   NORMALIZATION: bn # ['bn', 'in', 'ibn']
   POOLING: adaptive_max # ['adaptive_max', 'gem', 'softpool']
-  NECK: linear # ['none', 'linear', 'affine', 'mlp']
+  NECK: bnneck # ['none', 'linear', 'affine', 'mlp', 'bnneck']
   L2_NORMALIZE: True # L2 normalize the embeddings.
   SIMILARITY_SEARCH: MIPS # ['MCSS', 'NNS', 'MIPS'] If L2_NORMALIZE is True, use 'MIPS' for faster search.
   DOWNSAMPLE_FACTOR: 20 # Downsampling factor.
@@ -16,22 +16,34 @@ TRAIN:
   FEATURES_DIR: /data/audio/cqt/
   TRAIN_CLIQUES: /data/discogs/Discogs-VI-YT-20240701-light.json.train
   VALIDATION_CLIQUES: /data/discogs/Discogs-VI-YT-20240701-light.json.val
-  M_PER_CLASS: 2 # Number of versions per clique during a training iteration.
+  M_PER_CLASS: 8 # Number of versions per clique during a training iteration.
   SCALE: normalize # ['normalize', 'upscale']
   MAX_LENGTH: 7600 # Number of frames to consider as context, before downsampling.
-  BATCH_SIZE: 96 # Number of versions in batch.
-  EPOCHS: 50 # Number of epochs to train.
+  BATCH_SIZE: 216 # Number of versions in batch.
+  EPOCHS: 40 # Number of epochs to train.
   LOSS:
+    PROTOTYPICAL:
+      WEIGHT: 1.0
+      N_SUPPORT: 2
     TRIPLET:
-      MARGIN: 0.3 # Triplet loss margin
-      POSITIVE_MINING: random # ['hard', 'random', 'easy']
-      NEGATIVE_MINING: hard # ['hard', 'random', 'semi-hard']
+      WEIGHT: 1 # Weight of the loss.
+      MARGIN: 0.2 # Triplet loss margin
+      POSITIVE_MINING: hard # ['hard', 'random', 'easy']
+      NEGATIVE_MINING: hard # ['hard', 'random', 'semi-hard']        SQUARED_DISTANCE: False # Use squared distance in the loss.
       SQUARED_DISTANCE: False # Use squared distance in the loss.
       NON_ZERO_MEAN: True # If true, the zero losses in the batch are filtered out before averaging.
+    CENTER:
+      WEIGHT: 0.001 # Weight of the loss.
+      NUM_CLS: 76_775 # Number of classes.
+      FEAT_DIM: 512 # Embedding dimension
+      SHARE_BN: True
+    SOFTMAX:
+      LABEL_SMOOTHING: 0.1
+      OUTPUT_DIM: 76_775 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.
   OPTIMIZER: Adam # ['Adam', 'AdamW']
   AUTOMATIC_MIXED_PRECISION: True # Use mixed precision training.
   LR:
-    SCHEDULE: LIN-WARMUP-PCWS # ['NONE', 'STEP', 'MULTISTEP', 'EXPONENTIAL', 'COSINE', 'LIN-WARMUP-PCWS'].
+    SCHEDULE: LIN-WARMUP-PCWS # ['NONE', 'STEP', 'MULTISTEP', 'EXPONENTIAL', 'COSINE, LIN-WARMUP-PCWS'].
     LR: 0.0001 # Starting learning rate in case of a schedule or constant in case of NONE.
     PARAMS:
       MAX_LR: 0.01
@@ -44,4 +56,4 @@ TRAIN:
         - [38, 0.0000001]
   CUDA_DETERMINISTIC: False # Set to True for deterministic training.
   CUDA_BENCHMARK: False # Set to True for benchmarking.
-  CLIQUE_USAGE_RATIO: 1.0 # Fraction of training data to use. Useful for debugging. 1.0 to use 100% of data.
+  CLIQUE_USAGE_RATIO: 0.01 # Fraction of training data to use. Useful for debugging. 1.0 to use 100% of data.

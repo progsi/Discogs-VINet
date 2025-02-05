@@ -202,12 +202,13 @@ if __name__ == "__main__":
     )
 
     # To evaluate the model in an Information Retrieval setting
+    min_length = config["TRAIN"].get("MIN_LENGTH")
     eval_dataset = TestDataset(
         config["TRAIN"]["VALIDATION_CLIQUES"],
         config["TRAIN"]["FEATURES_DIR"],
         mean_downsample_factor=config["MODEL"]["DOWNSAMPLE_FACTOR"],
         scale=config["TRAIN"]["SCALE"],
-        min_length=config["TRAIN"]["MIN_LENGTH"],
+        min_length=min_length,
     )
     eval_loader = DataLoader(
         eval_dataset,
