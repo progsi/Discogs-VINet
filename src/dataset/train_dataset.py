@@ -7,7 +7,6 @@ import numpy as np
 import torch
 
 from .dataset import BaseDataset
-from .dataset_utils import mean_downsample_cqt, normalize_cqt, upscale_cqt_values
 
 class TrainDataset(BaseDataset):
     """Training dataset.
@@ -143,7 +142,10 @@ class TrainDataset(BaseDataset):
         label = self.labels[index]
         # Get feature
         version = self.versions[index]
-        feature = self.load_cqt(version["youtube_id"])
+        
+        feature_dir = self.features_dir / version["youtube_id"][:2]
+        feature = self.load_cqt(feature_dir=feature_dir, feature_id=version["youtube_id"], 
+                                min_length=self.min_length, max_length=self.max_length)
         
         if self.transform:
             feature = self.transform(feature)
@@ -154,94 +156,6 @@ class TrainDataset(BaseDataset):
         """Each version appears once at each epoch."""
 
         return len(self.labels)
-
-    def load_cqt(self, yt_id) -> torch.Tensor:
-        """Load the magnitude CQT features for a single version with yt_id from the features
-        directory. Loads the memmap file, if the feature is long enough it takes a random
-        chunk or pads the feature if it is too short. Then it downsamples the feature in time,
-        clips the feature to the dynamic range, and scales the feature if specified
-        Converts to torch tensor float32.
-
-        Parameters:
-        -----------
-        yt_id : str
-            The YouTube ID of the version
-
-        Returns:
-        --------
-        feature : torch.FloatTensor
-            The CQT feature of the version dtype=float32, shape: (F, T)
-            T is the downsampled context length, which is determined during initialization.
-        """
-
-        # Get the directory of the features
-        feature_dir = self.features_dir / yt_id[:2]
-        # We store the features as a memmap file
-        feature_path = feature_dir / f"{yt_id}.mm"
-        # And the shape as a separate numpy array
-        feature_shape_path = feature_dir / f"{yt_id}.npy"
-        # Load the memmap shape
-        feature_shape = tuple(np.load(feature_shape_path, mmap_mode="r"))
-
-        # Load the magnitude CQT
-        length = random.randint(self.min_length, self.max_length)
-        if feature_shape[0] > length:
-            # If the feature is long enough, take a random chunk
-            start = np.random.randint(0, feature_shape[0] - length)
-            fp = np.memmap(
-                feature_path,
-                dtype="float16",
-                mode="r",
-                shape=(length, feature_shape[1]),
-                offset=start * feature_shape[1] * 2,  # 2 bytes per float16
-            )
-        else:
-            # Load the whole feature
-            fp = np.memmap(
-                feature_path,
-                dtype="float16",
-                mode="r",
-                shape=feature_shape,
-            )
-
-        # Convert to float32
-        feature = np.array(fp, dtype=np.float32)  # (T, F)
-        del fp
-        assert feature.size > 0, "Empty feature"
-        assert feature.ndim == 2, f"Expected 2D feature, got {feature.ndim}D"
-        assert (
-            feature.shape[1] == self.cqt_bins
-        ), f"Expected {self.cqt_bins} features, got {feature.shape[1]}"
-
-        # Pad the feature if it is too short
-        if feature.shape[0] < length:
-            feature = np.pad(
-                feature,
-                ((0, length - feature_shape[0]), (0, 0)),
-                mode="constant",
-                constant_values=0,
-            )
-
-        # Downsample the feature in time
-        if self.mean_downsample_factor > 1:
-            feature = mean_downsample_cqt(feature, self.mean_downsample_factor)
-
-        # Clip the feature below zero to be sure
-        feature = np.where(feature < 0, 0, feature)
-
-        # Scale the feature to [0,1] if specified
-        if self.scale == "normalize":
-            feature = normalize_cqt(feature)
-        elif self.scale == "upscale":
-            feature = upscale_cqt_values(feature)
-
-        # Transpose to (F, T) because the CQT is stored as (T, F)
-        feature = feature.T
-
-        # Convert to tensor (view not a copy)
-        feature = torch.from_numpy(feature)
-
-        return feature
 
     @staticmethod
     def collate_fn(items) -> Tuple[torch.Tensor, torch.Tensor]:

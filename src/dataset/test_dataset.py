@@ -134,77 +134,8 @@ class TestDataset(BaseDataset):
             Label for the feature 'clique_id|version_id'. Depends on the value of encode_version.
             NOTE: Our labels are not consecutive integers. They are the clique_id.
         """
-
-        if self.datacos:
-            clique_id, version_id = self.items[idx]
-            if encode_version:
-                label = f"{clique_id}|{version_id}"
-            else:
-                label = int(clique_id.split("W_")[1])
-            _id = version_id
-            feature_dir = self.features_dir
-        else:
-            clique_id, version_idx = self.items[idx]
-            version_dict = self.cliques[clique_id][version_idx]
-            if encode_version:
-                label = f'{clique_id}|{version_dict["version_id"]}'
-            else:
-                if self.discogs_vi:
-                    label = int(clique_id.split("C-")[1])
-                else:
-                    label = int(clique_id)
-            _id = version_dict["youtube_id"]
-            feature_dir = self.features_dir / _id[:2]
-
-        # We store the features as a memmap file and the shape as a separate numpy array
-        feature_path = feature_dir / f"{_id}.mm"
-        feature_shape_path = feature_dir / f"{_id}.npy"
-
-        # Load the entire memmap file as we use full tracks in evaluation
-        feature_shape = tuple(np.load(feature_shape_path))
-        fp = np.memmap(
-            feature_path,
-            dtype="float16",
-            mode="r",
-            shape=feature_shape,
-        )  # (T, F)
-        # Convert to float32
-        feature = np.array(fp, dtype=np.float32)
-        del fp
-        assert feature.size > 0, "Empty feature"
-        assert feature.ndim == 2, f"Expected 2D feature, got {feature.ndim}D"
-        assert (
-            feature.shape[1] == self.cqt_bins
-        ), f"Expected {self.cqt_bins} features, got {feature.shape[1]}"
-
-        # Pad the feature if it is too short
-        # NOTE: I took this value from CQTNet without giving it too much thought
-        if feature.shape[0] < 4000:
-            feature = np.pad(
-                feature,
-                ((0, 4000 - feature.shape[0]), (0, 0)),
-                "constant",
-                constant_values=0,
-            )
-
-        # Downsample the feature in time by taking the mean
-        if self.mean_downsample_factor > 1:
-            feature = mean_downsample_cqt(feature, self.mean_downsample_factor)
-
-        # Clip the feature below zero to be sure
-        feature = np.where(feature < 0, 0, feature)
-
-        # Scale the feature to [0,1] if specified
-        if self.scale == "normalize":
-            feature = normalize_cqt(feature)
-        elif self.scale == "upscale":
-            feature = upscale_cqt_values(feature)
-        
-        # Transpose to (F, T) because the CQT is stored as (T, F)
-        feature = feature.T
-
-        # Convert to tensor (view not a copy)
-        feature = torch.from_numpy(feature)
+        clique_id, label, feature_id, feature_dir = self.get_feature_info(idx, encode_version)
+        feature = self.load_cqt(feature_dir, feature_id)
 
         return feature, label
 

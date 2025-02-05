@@ -1,6 +1,11 @@
 from collections import defaultdict
+import random 
 
+import numpy as np
+import torch
 from torch.utils.data import Dataset
+
+from .dataset_utils import mean_downsample_cqt, normalize_cqt, upscale_cqt_values
 
 class BaseDataset(Dataset):
     """BaseDataset with elementary functions.
@@ -33,3 +38,124 @@ class BaseDataset(Dataset):
             # Remove cliques without remaining values
             if not self.cliques[clique_id]:
                 del self.cliques[clique_id]
+    
+    def get_feature_info(self, idx, encode_version=True):
+        if self.datacos:
+            clique_id, version_id = self.items[idx]
+            if encode_version:
+                label = f"{clique_id}|{version_id}"
+            else:
+                label = int(clique_id.split("W_")[1])
+            feature_id = version_id
+            feature_dir = self.features_dir
+        else:
+            clique_id, version_idx = self.items[idx]
+            version_dict = self.cliques[clique_id][version_idx]
+            if encode_version:
+                label = f'{clique_id}|{version_dict["version_id"]}'
+            else:
+                if self.discogs_vi:
+                    label = int(clique_id.split("C-")[1])
+                else:
+                    label = int(clique_id)
+            feature_id = version_dict["youtube_id"]
+            feature_dir = self.features_dir / feature_id[:2]
+        return clique_id, label, feature_id, feature_dir
+            
+    def load_cqt(self, 
+                 feature_dir: str,
+                 feature_id: str, 
+                 min_length: int = None, 
+                 max_length: int = None) -> torch.Tensor:
+        """Load the magnitude CQT features for a single version with yt_id from the features
+        directory. Loads the memmap file, if the feature is long enough it takes a random
+        chunk or pads the feature if it is too short. Then it downsamples the feature in time,
+        clips the feature to the dynamic range, and scales the feature if specified
+        Converts to torch tensor float32.
+
+        Parameters:
+        -----------
+        yt_id : str
+            The YouTube ID of the version
+
+        Returns:
+        --------
+        feature : torch.FloatTensor
+            The CQT feature of the version dtype=float32, shape: (F, T)
+            T is the downsampled context length, which is determined during initialization.
+        """
+        # We store the features as a memmap file
+        feature_path = feature_dir / f"{feature_id}.mm"
+        # And the shape as a separate numpy array
+        feature_shape_path = feature_dir / f"{feature_id}.npy"
+        # Load the memmap shape
+        feature_shape = tuple(np.load(feature_shape_path, mmap_mode="r"))
+
+        # Load the magnitude CQT
+        if min_length and max_length:
+            length = random.randint(min_length, max_length)
+        elif min_length is None and max_length is None:
+            length = feature_shape[0]
+        elif min_length is None:
+            length = random.randint(1, max_length)
+        elif max_length is None:
+            length = random.randint(min_length, feature_shape[0])
+    
+        if feature_shape[0] > length:
+            # If the feature is long enough, take a random chunk
+            start = np.random.randint(0, feature_shape[0] - length)
+            fp = np.memmap(
+                feature_path,
+                dtype="float16",
+                mode="r",
+                shape=(length, feature_shape[1]),
+                offset=start * feature_shape[1] * 2,  # 2 bytes per float16
+            )
+        else:
+            # Load the whole feature
+            fp = np.memmap(
+                feature_path,
+                dtype="float16",
+                mode="r",
+                shape=feature_shape,
+            )
+
+        # Convert to float32
+        feature = np.array(fp, dtype=np.float32)  # (T, F)
+        del fp
+        assert feature.size > 0, "Empty feature"
+        assert feature.ndim == 2, f"Expected 2D feature, got {feature.ndim}D"
+        assert (
+            feature.shape[1] == self.cqt_bins
+        ), f"Expected {self.cqt_bins} features, got {feature.shape[1]}"
+
+        # Pad the feature if it is too short
+        if feature.shape[0] < length:
+            feature = np.pad(
+                feature,
+                ((0, length - feature_shape[0]), (0, 0)),
+                mode="constant",
+                constant_values=0,
+            )
+
+        # Downsample the feature in time
+        if self.mean_downsample_factor > 1:
+            feature = mean_downsample_cqt(feature, self.mean_downsample_factor)
+
+        # Clip the feature below zero to be sure
+        feature = np.where(feature < 0, 0, feature)
+
+        # Scale the feature to [0,1] if specified
+        if self.scale == "normalize":
+            feature = normalize_cqt(feature)
+        elif self.scale == "upscale":
+            feature = upscale_cqt_values(feature)
+
+        # Transpose to (F, T) because the CQT is stored as (T, F)
+        feature = feature.T
+
+        # Convert to tensor (view not a copy)
+        feature = torch.from_numpy(feature)
+
+        return feature
+
