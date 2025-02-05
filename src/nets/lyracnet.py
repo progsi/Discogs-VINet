@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from src.nets.pooling import GeM, IBN
-from src.losses import TRIPLET_LOSS, CENTER_LOSS, PROTOTYPICAL_LOSS, SOFTMAX_LOSS
+from src.nets.neck import SimpleNeck, BNNeck
 
 class BasicBlock(nn.Module):
     def __init__(self, in_planes, out_planes, stride, dropout=0.0, activate_before_residual=False):
@@ -57,9 +57,9 @@ class NetworkBlock(nn.Module):
     def forward(self, x):
         return self.layer(x)
     
-
+    
 class LyraCNet(nn.Module):
-    def __init__(self, depth, embed_dim, num_blocks, widen_factor, num_classes, 
+    def __init__(self, depth, embed_dim, num_blocks, widen_factor, loss_config, 
                  dropout=0.0, dense_dropout=0.0):
         super(LyraCNet, self).__init__()
         
@@ -91,12 +91,11 @@ class LyraCNet(nn.Module):
         self.drop = nn.Dropout(dense_dropout)        
         self.pooling = GeM() # flattening necessary?
         
-        self.fc1 = nn.Linear(nChannels[-1], embed_dim)
-        self.fc2 = nn.Linear(embed_dim, embed_dim, bias=False)
-        self.fc3 = nn.Linear(embed_dim, embed_dim, bias=False)
-        # TODO: might need batch norm. here?
+        if loss_config is None:
+            self.proj = SimpleNeck(nChannels[-1], embed_dim, projection="linear") # TODO: make adjustable?
+        else:
+            self.proj = BNNeck(nChannels[-1], embed_dim, loss_config=loss_config)
         
-        self.cls = nn.Linear(embed_dim, num_classes, bias=False)
         self.nChannels = nChannels[-1]
 
         for m in self.modules():
@@ -120,16 +119,9 @@ class LyraCNet(nn.Module):
         x = self.relu(x) 
         x = self.pooling(x)
         x = x.view(-1, self.nChannels)
-
-        f_p = self.fc1(x) # for prototypical loss
-        f_t = self.fc2(f_p) # for triplet + center loss
-        f   = self.fc3(f_t) # inference embedding
-
-        cls = self.cls(f) # for classification loss
-        return f, {
-            PROTOTYPICAL_LOSS: f_p,
-            TRIPLET_LOSS: f_t,
-            CENTER_LOSS: f_t,
-            SOFTMAX_LOSS: cls
-        }
         
+        out = self.proj(x)
+        
+        return out
+
+

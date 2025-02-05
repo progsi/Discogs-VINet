@@ -18,7 +18,7 @@ from evaluate import evaluate
 from src.dataset import TrainDataset, TestDataset
 from src.utils import load_model, save_model
 from src.utilities.utils import format_time
-from src.losses import init_loss, WeightedMultiloss
+from src.losses import WeightedMultiloss
 from src.dataset.augmentation import SpecAug
 
 SEED = 27  # License plate code of Gaziantep, gastronomical capital of Türkiye
@@ -158,7 +158,7 @@ if __name__ == "__main__":
     torch.backends.cudnn.benchmark = config["TRAIN"]["CUDA_BENCHMARK"]  # type: ignore
 
     # Load or create the model
-    model, optimizer, scheduler, scaler, start_epoch, train_loss, best_mAP = load_model(
+    model, loss_func, optimizer, scheduler, scaler, start_epoch, train_loss, best_mAP = load_model(
         config, device
     )
 
@@ -216,9 +216,7 @@ if __name__ == "__main__":
         drop_last=False,
         num_workers=args.num_workers,
     )
-    
-    loss_func = init_loss(config["TRAIN"]["LOSS"])
-    
+        
     # Log the initial lr
     if not args.no_wandb:
         if scheduler is not None:

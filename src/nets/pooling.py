@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from typing import Optional
 import logging
 
-class Linear(torch.nn.Module):
+class LinearWithGain(torch.nn.Module):
   def __init__(self, in_dim, out_dim, bias=True, w_init_gain='linear'):
     super(Linear, self).__init__()
     self.linear_layer = torch.nn.Linear(in_dim, out_dim, bias=bias)
@@ -55,7 +55,7 @@ class AttentiveStatisticsPooling(torch.nn.Module):
     super().__init__()
 
     self.eps = 1e-12
-    self.linear = Linear(channels * 3, channels)
+    self.linear = LinearWithGain(channels * 3, channels)
     self.tanh = torch.nn.Tanh()
     self.conv = Conv1d(
       in_channels=channels, out_channels=channels, kernel_size=1

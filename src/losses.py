@@ -75,14 +75,13 @@ class WeightedMultiloss(nn.Module):
     def __init__(self, loss_config: dict):
         super(WeightedMultiloss, self).__init__()
         
-        self.losses_with_weights = []  # Store (loss_name, loss_fn, weight, is_cls_loss) tuples
+        self.losses = {}  # Store (loss_fn, weight)
         self.loss_stats = {} # to store current loss stats
 
         for loss_name, loss_params in loss_config.items():
             loss_fn = init_single_loss(loss_name, loss_params)
             weight = loss_params.get('WEIGHT', 1.0)
-            is_cls = is_cls_loss(loss_name)
-            self.losses_with_weights.append((loss_name, loss_fn, weight, is_cls))
+            self.losses[loss_name] = (loss_fn, weight)
             self.loss_stats[loss_name] = {}
     
     def forward(self, preds: Dict[str, torch.Tensor], labels: torch.Tensor) -> torch.Tensor:
@@ -96,9 +95,9 @@ class WeightedMultiloss(nn.Module):
         
         total_loss = 0
         
-        for loss_name, loss_fn, weight, is_cls in self.losses_with_weights:
+        for loss_name, (loss_fn, weight) in self.losses.items():
 
-            x = preds[loss_name.lower()] 
+            x = preds[loss_name] 
             
             # compute and weigh
             loss = loss_fn(x, labels)

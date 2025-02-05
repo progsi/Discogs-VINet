@@ -6,7 +6,6 @@ MODEL :
   DEPTH: 28 
   NUM_BLOCKS: 4
   WIDEN_FACTOR: 8
-  OUTPUT_CLS: 76_775 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.
   FREQUENCY_BINS: 84
   SAMPLE_RATE: 22050
   DOWNSAMPLE_FACTOR: 15 # might try out 20?
@@ -28,6 +27,9 @@ TRAIN:
     BATCH_SIZE: 8 # Number of versions in batch.
     EPOCHS: 200 # Number of epochs to train.
     LOSS:
+      PROTOTYPICAL:
+        WEIGHT: 1.0
+        N_SUPPORT: 2
       TRIPLET:
         WEIGHT: 1 # Weight of the loss.
         MARGIN: 0.2 # Triplet loss margin
@@ -39,11 +41,10 @@ TRAIN:
         WEIGHT: 0.001 # Weight of the loss.
         NUM_CLS: 76_775 # Number of classes.
         FEAT_DIM: 1024 # Embedding dimension
-      PROTOTYPICAL:
-        WEIGHT: 1.0
-        N_SUPPORT: 2
+        SHARE_BN: True
       SOFTMAX:
         LABEL_SMOOTHING: 0.1
+        OUTPUT_DIM: 76_775 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.
     OPTIMIZER: Adam # ['Adam', 'AdamW']
     WEIGHT_DECAY: 0.00001 
     AUTOMATIC_MIXED_PRECISION: True # Use mixed precision training.
@@ -51,7 +52,7 @@ TRAIN:
       SCHEDULE: COSINE # ['NONE', 'STEP', 'MULTISTEP', 'EXPONENTIAL' 'EXPONENTIAL-MIN_LR', 'COSINE, LIN-WARMUP-PCWS'].
       LR: 0.001 
       PARAMS:
-        T_0: 60_000 # 40 Epochs (approx. the same iterations like in the paper with 40 epochs, but on SHS100K).
+        T_0: 40
     AUGMENTATION:
       T: 40 # maximum time mask
       F: 30 # maximum frequency mask

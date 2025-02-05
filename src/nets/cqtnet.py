@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 
 from src.utilities.tensor_op import l2_normalize
-from src.nets.pooling import Linear, IBN, GeM, SoftPool
-
+from src.nets.pooling import IBN, GeM, SoftPool
+from src.nets.neck import SimpleNeck, BNNeck
 
 class CQTNet(nn.Module):
     def __init__(
@@ -14,11 +14,13 @@ class CQTNet(nn.Module):
         pool: str = "adaptive_max",
         l2_normalize: bool = True,
         projection: str = "linear",
+        loss_config: dict = None,
     ):
         super().__init__()
 
         assert ch_in > 0
         assert embed_dim > 0
+        assert not (projection == "bnneck" and loss_config is None), "BNNeck requires loss config!"
 
         self.embed_dim = embed_dim
         self.l2_normalize = l2_normalize
@@ -116,31 +118,20 @@ class CQTNet(nn.Module):
         else:
             raise NotImplementedError
 
-        if projection.lower() == "linear":
-            self.proj = Linear(16 * ch_in, embed_dim, bias=False)
-        elif projection.lower() == "affine":
-            self.proj = Linear(16 * ch_in, embed_dim)
-        elif projection.lower() == "mlp":
-            self.proj = nn.Sequential(
-                Linear(16 * ch_in, 32 * ch_in),
-                nn.ReLU(inplace=True),
-                Linear(32 * ch_in, embed_dim, bias=False),  # TODO bias=True?
-            )
-        elif projection.lower() == "none":
-            self.proj = nn.Identity()
+        if not loss_config:
+            self.proj = SimpleNeck(projection, 16 * ch_in, embed_dim)
         else:
-            raise NotImplementedError
-
+            self.proj = BNNeck(16 * ch_in, embed_dim, loss_config)
         # TODO add batch norm here (If BNNeck)
 
     def forward(self, x):
         x = self.front_end(x)
         x = self.pool(x)
         x = torch.flatten(x, 1)
-        x = self.proj(x)
+        x, loss_dict = self.proj(x)
 
         # L2 normalization with 0 norm handling
         if self.l2_normalize:
             x = l2_normalize(x, precision="high")
 
-        return x, None # for compatibility
+        return x, loss_dict

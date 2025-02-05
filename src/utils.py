@@ -9,6 +9,7 @@ from src.nets.cqtnet import CQTNet
 from src.nets.coverhunter import CoverHunter
 from src.nets.lyracnet import LyraCNet
 from src.nets.versegnet import VerSegNet
+from src.losses import init_loss
 from src.lr_schedulers import (
     CosineAnnealingWarmRestartsWithWarmup,
     WarmupPiecewiseConstantScheduler,
@@ -30,8 +31,21 @@ def count_model_parameters(model, verbose: bool = True) -> Tuple[int, int]:
     return grad_params, non_grad_params
 
 
-def build_model(config: dict, device: str) -> CQTNet:
-
+def build_model_with_loss(config: dict, device: str) -> Tuple[torch.nn.Module, torch.nn.Module]:
+    """builds model and loss.
+    Args:
+        config (dict): config with parameters
+        device (str): device, eg. cuda, cpu
+    Raises:
+        ValueError: 
+    Returns:
+        Tuple[torch.nn.Module, torch.nn.Module]: model, loss
+    """
+        # Init Loss
+    loss_config = config["TRAIN"]["LOSS"]
+    
+    loss_func = init_loss(loss_config)
+    
     if config["MODEL"]["ARCHITECTURE"].upper() == "CQTNET":
         model = CQTNet(
             ch_in=config["MODEL"]["CONV_CHANNEL"],
@@ -57,7 +71,7 @@ def build_model(config: dict, device: str) -> CQTNet:
             embed_dim=config["MODEL"]["EMBEDDING_SIZE"], 
             num_blocks=config["MODEL"]["NUM_BLOCKS"],
             widen_factor=config["MODEL"]["WIDEN_FACTOR"],
-            num_classes=config["MODEL"]["OUTPUT_CLS"],
+            loss_config=config["TRAIN"]["LOSS"]
             ).to(device)
     elif config["MODEL"]["ARCHITECTURE"].upper() == "VERSEGNET":
         model = VerSegNet(
@@ -77,7 +91,7 @@ def build_model(config: dict, device: str) -> CQTNet:
     else:
         raise ValueError("Model architecture not recognized.")
     _, _ = count_model_parameters(model)
-    return model
+    return model, loss_func
 
 
 def save_model(
@@ -122,8 +136,8 @@ def save_model(
 def load_model(config: dict, device: str, mode="train"):
 
     assert mode in ["train", "infer"], "Mode must be either 'train' or 'infer'"
-
-    model = build_model(config, device)
+    
+    model, loss_func = build_model_with_loss(config, device)
 
     if mode == "train":
 
@@ -221,7 +235,7 @@ def load_model(config: dict, device: str, mode="train"):
         else:
             print("\033[31mNo checkpoint path provided\033[0m")
             print("Training from scratch.")
-        return model, optimizer, scheduler, scaler, start_epoch, train_loss, mAP
+        return model, loss_func, optimizer, scheduler, scaler, start_epoch, train_loss, mAP
 
     else:
         if "CHECKPOINT_PATH" in config["MODEL"]:
