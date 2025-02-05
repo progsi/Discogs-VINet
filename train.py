@@ -46,12 +46,13 @@ def train_epoch(
         
         with torch.autocast(device_type=device.type, dtype=torch.float16, enabled=amp):
             
-            _, preds = model(features)
+            x, loss_dict = model(features)
+            embs = loss_dict if loss_dict is not None else x
             
             if isinstance(loss_func, WeightedMultiloss):
-                loss = loss_func(preds, labels)
+                loss = loss_func(embs, labels)
             else:
-                loss = loss_func(preds["inference"], labels)
+                loss = loss_func(embs["inference"], labels)
                 
         if amp:
             scaler.scale(loss).backward()  # type: ignore

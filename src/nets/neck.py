@@ -23,7 +23,8 @@ class SimpleNeck(nn.Module):
             raise NotImplementedError
         
     def forward(self, x):
-        return self.layer(x), None # for compatibility
+        x = self.layer(x)
+        return x, None
 
 class BNNeck(nn.Module):
     def __init__(self, input_dim: int, embed_dim: int, loss_config: dict, bias: bool = False):

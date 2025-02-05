@@ -1,3 +1,5 @@
+from typing import Dict, Union
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -59,10 +61,18 @@ class NetworkBlock(nn.Module):
     
     
 class LyraCNet(nn.Module):
-    def __init__(self, depth, embed_dim, num_blocks, widen_factor, loss_config, 
-                 dropout=0.0, dense_dropout=0.0):
+    def __init__(self, 
+                 depth: int, 
+                 embed_dim: int, 
+                 num_blocks: int, 
+                 widen_factor: int, 
+                 neck: str = "linear",
+                 loss_config: Dict[str,Union[int,str]] = None,
+                 dropout: float = 0.0, 
+                 dense_dropout: float = 0.0):
         super(LyraCNet, self).__init__()
         
+        assert not (neck == "bnneck" and loss_config is None), "BNNeck requires loss_config!"
         self.num_blocks = num_blocks
         self.embed_dim = embed_dim
         
@@ -91,11 +101,11 @@ class LyraCNet(nn.Module):
         self.drop = nn.Dropout(dense_dropout)        
         self.pooling = GeM() # flattening necessary?
         
-        if loss_config is None:
-            self.proj = SimpleNeck(nChannels[-1], embed_dim, projection="linear") # TODO: make adjustable?
+        if neck != "bnneck":
+            self.neck = SimpleNeck(self.embed_dim, embed_dim, neck)
         else:
-            self.proj = BNNeck(nChannels[-1], embed_dim, loss_config=loss_config)
-        
+            self.neck = BNNeck(self.embed_dim, embed_dim, loss_config)
+                    
         self.nChannels = nChannels[-1]
 
         for m in self.modules():
@@ -120,7 +130,7 @@ class LyraCNet(nn.Module):
         x = self.pooling(x)
         x = x.view(-1, self.nChannels)
         
-        out = self.proj(x)
+        out = self.neck(x)
         
         return out
 

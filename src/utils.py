@@ -16,7 +16,6 @@ from src.lr_schedulers import (
     ExponentialWithMinLR
 )
 
-
 def count_model_parameters(model, verbose: bool = True) -> Tuple[int, int]:
     """Counts the number of parameters in a model."""
 
@@ -53,7 +52,8 @@ def build_model_with_loss(config: dict, device: str) -> Tuple[torch.nn.Module, t
             norm=config["MODEL"]["NORMALIZATION"],
             pool=config["MODEL"]["POOLING"],
             l2_normalize=config["MODEL"]["L2_NORMALIZE"],
-            projection=config["MODEL"]["PROJECTION"],
+            neck=config["MODEL"]["NECK"],
+            loss_config=loss_config
         ).to(device)
     elif config["MODEL"]["ARCHITECTURE"].upper() == "COVERHUNTER":
         model = CoverHunter(
@@ -71,7 +71,8 @@ def build_model_with_loss(config: dict, device: str) -> Tuple[torch.nn.Module, t
             embed_dim=config["MODEL"]["EMBEDDING_SIZE"], 
             num_blocks=config["MODEL"]["NUM_BLOCKS"],
             widen_factor=config["MODEL"]["WIDEN_FACTOR"],
-            loss_config=config["TRAIN"]["LOSS"]
+            neck="bnneck",
+            loss_config=loss_config
             ).to(device)
     elif config["MODEL"]["ARCHITECTURE"].upper() == "VERSEGNET":
         model = VerSegNet(

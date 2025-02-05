@@ -1,3 +1,4 @@
+from typing import Union, Dict
 import torch
 import torch.nn as nn
 
@@ -13,14 +14,14 @@ class CQTNet(nn.Module):
         norm: str = "bn",
         pool: str = "adaptive_max",
         l2_normalize: bool = True,
-        projection: str = "linear",
-        loss_config: dict = None,
+        neck: str = "linear",
+        loss_config: Dict[str,Union[int,str]] = None,
     ):
         super().__init__()
 
         assert ch_in > 0
         assert embed_dim > 0
-        assert not (projection == "bnneck" and loss_config is None), "BNNeck requires loss config!"
+        assert not (neck == "bnneck" and loss_config is None), "BNNeck requires loss_config!"
 
         self.embed_dim = embed_dim
         self.l2_normalize = l2_normalize
@@ -118,17 +119,17 @@ class CQTNet(nn.Module):
         else:
             raise NotImplementedError
 
-        if not loss_config:
-            self.proj = SimpleNeck(projection, 16 * ch_in, embed_dim)
+        if neck != "bnneck":
+            self.neck = SimpleNeck(16 * ch_in, embed_dim, neck)
         else:
-            self.proj = BNNeck(16 * ch_in, embed_dim, loss_config)
+            self.neck = BNNeck(16 * ch_in, embed_dim, loss_config)
         # TODO add batch norm here (If BNNeck)
 
     def forward(self, x):
         x = self.front_end(x)
         x = self.pool(x)
         x = torch.flatten(x, 1)
-        x, loss_dict = self.proj(x)
+        x, loss_dict = self.neck(x)
 
         # L2 normalization with 0 norm handling
         if self.l2_normalize:

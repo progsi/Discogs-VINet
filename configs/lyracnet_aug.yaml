@@ -6,7 +6,6 @@ MODEL :
   DEPTH: 28 
   NUM_BLOCKS: 4
   WIDEN_FACTOR: 8
-  OUTPUT_CLS: 76_775 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.
   FREQUENCY_BINS: 84
   SAMPLE_RATE: 22050
   DOWNSAMPLE_FACTOR: 15 # might try out 20?
@@ -54,6 +53,7 @@ TRAIN:
         SHARE_BN: True
       SOFTMAX:
         LABEL_SMOOTHING: 0.1
+        OUTPUT_DIM: 76_775 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.
     OPTIMIZER: Adam # ['Adam', 'AdamW']
     WEIGHT_DECAY: 0.00001 
     AUTOMATIC_MIXED_PRECISION: True # Use mixed precision training.
