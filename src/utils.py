@@ -9,7 +9,7 @@ from src.nets.cqtnet import CQTNet
 from src.nets.coverhunter import CoverHunter
 from src.nets.lyracnet import LyraCNet
 from src.nets.versegnet import VerSegNet
-from src.losses import init_loss
+from src.losses import init_loss, WeightedMultiloss
 from src.lr_schedulers import (
     CosineAnnealingWarmRestartsWithWarmup,
     WarmupPiecewiseConstantScheduler,
@@ -44,6 +44,10 @@ def build_model_with_loss(config: dict, device: str) -> Tuple[torch.nn.Module, t
     loss_config = config["TRAIN"]["LOSS"]
     
     loss_func = init_loss(loss_config)
+    
+    assert not (
+        isinstance(loss_func, WeightedMultiloss) and 
+        config["MODEL"]["NECK"] != "bnneck"), "WeightedMultiloss only works with BNNeck"
     
     if config["MODEL"]["ARCHITECTURE"].upper() == "CQTNET":
         model = CQTNet(

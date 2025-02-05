@@ -87,7 +87,7 @@ class WeightedMultiloss(nn.Module):
     def forward(self, preds: Dict[str, torch.Tensor], labels: torch.Tensor) -> torch.Tensor:
         """Calculates Multiloss.
         Args:
-            preds (Dict[str, torch.Tensor]): Mapping of loss names to predictions (embeddings or cls) per loss
+            preds (Union[torch.Tensor, Dict[str, torch.Tensor]]): Mapping of loss names to predictions (embeddings or cls) per loss
             labels (torch.Tensor): Target labels.
         Returns:
             torch.Tensor: total loss
@@ -96,9 +96,9 @@ class WeightedMultiloss(nn.Module):
         total_loss = 0
         
         for loss_name, (loss_fn, weight) in self.losses.items():
-
-            x = preds[loss_name] 
             
+            x = preds[loss_name] 
+
             # compute and weigh
             loss = loss_fn(x, labels)
             loss_weighted = loss * weight

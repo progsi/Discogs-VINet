@@ -49,10 +49,8 @@ def train_epoch(
             x, loss_dict = model(features)
             embs = loss_dict if loss_dict is not None else x
             
-            if isinstance(loss_func, WeightedMultiloss):
-                loss = loss_func(embs, labels)
-            else:
-                loss = loss_func(embs["inference"], labels)
+            loss = loss_func(embs, labels)
+
                 
         if amp:
             scaler.scale(loss).backward()  # type: ignore
@@ -208,7 +206,8 @@ if __name__ == "__main__":
         config["TRAIN"]["VALIDATION_CLIQUES"],
         config["TRAIN"]["FEATURES_DIR"],
         mean_downsample_factor=config["MODEL"]["DOWNSAMPLE_FACTOR"],
-        scale=config["TRAIN"]["SCALE"]
+        scale=config["TRAIN"]["SCALE"],
+        min_length=config["TRAIN"]["MIN_LENGTH"],
     )
     eval_loader = DataLoader(
         eval_dataset,

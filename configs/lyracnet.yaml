@@ -1,5 +1,5 @@
 MODEL :
-  NAME: lyracnet
+  NAME: LyraCNet
   # Model
   ARCHITECTURE: lyracnet
   EMBEDDING_SIZE: 1024 

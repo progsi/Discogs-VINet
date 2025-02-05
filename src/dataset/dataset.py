@@ -94,12 +94,8 @@ class BaseDataset(Dataset):
         # Load the magnitude CQT
         if min_length and max_length:
             length = random.randint(min_length, max_length)
-        elif min_length is None and max_length is None:
+        else:
             length = feature_shape[0]
-        elif min_length is None:
-            length = random.randint(1, max_length)
-        elif max_length is None:
-            length = random.randint(min_length, feature_shape[0])
     
         if feature_shape[0] > length:
             # If the feature is long enough, take a random chunk
@@ -130,10 +126,10 @@ class BaseDataset(Dataset):
         ), f"Expected {self.cqt_bins} features, got {feature.shape[1]}"
 
         # Pad the feature if it is too short
-        if feature.shape[0] < length:
+        if min_length and feature.shape[0] < min_length:
             feature = np.pad(
                 feature,
-                ((0, length - feature_shape[0]), (0, 0)),
+                ((0, min_length - feature_shape[0]), (0, 0)),
                 mode="constant",
                 constant_values=0,
             )

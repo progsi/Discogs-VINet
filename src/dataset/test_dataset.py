@@ -27,6 +27,7 @@ class TestDataset(BaseDataset):
         mean_downsample_factor: int = 20,
         cqt_bins: int = 84,
         scale: str = "norm",
+        min_length: int = None,
     ) -> None:
         """Initializes the dataset
 
@@ -55,6 +56,7 @@ class TestDataset(BaseDataset):
         self.mean_downsample_factor = mean_downsample_factor
         self.scale = scale
         self.cqt_bins = cqt_bins
+        self.min_length = min_length
 
         # Load the cliques
         print(f"Loading cliques from {cliques_json_path}")
@@ -135,7 +137,7 @@ class TestDataset(BaseDataset):
             NOTE: Our labels are not consecutive integers. They are the clique_id.
         """
         clique_id, label, feature_id, feature_dir = self.get_feature_info(idx, encode_version)
-        feature = self.load_cqt(feature_dir, feature_id)
+        feature = self.load_cqt(feature_dir, feature_id, self.min_length)
 
         return feature, label
 
