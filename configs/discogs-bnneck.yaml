@@ -19,6 +19,7 @@ TRAIN:
   M_PER_CLASS: 4 # Number of versions per clique during a training iteration.
   SCALE: normalize # ['normalize', 'upscale']
   MAX_LENGTH: 7600 # Number of frames to consider as context, before downsampling.
+  MIN_LENGTH: 4000 # required for cqtnet
   BATCH_SIZE: 216 # Number of versions in batch.
   EPOCHS: 40 # Number of epochs to train.
   LOSS:
