@@ -124,7 +124,8 @@ class WeightedMultilossInductive(WeightedMultiloss):
     def __init__(self, loss_config: dict):
         super(WeightedMultilossInductive, self).__init__(loss_config.pop("inductive"))
         self.inductive_losses, self.inductive_stats = self._init_losses(
-            loss_config["inductive"], name_key="INDUCTIVE_CLS")
+            loss_config["inductive"], 
+            name_key="INDUCTIVE_CLS")
         
     def forward(self, preds: Dict[str, torch.Tensor], labels: Dict[str,torch.Tensor]) -> torch.Tensor:
         """Calculates Multiloss.
@@ -137,18 +138,19 @@ class WeightedMultilossInductive(WeightedMultiloss):
         
         total_loss = super().forward(preds, labels["cls"])
         # TODO: must implement properly here!
-        for loss_name, (loss_fn, weight) in self.inductive_losses.items(): 
+        for inductive_cls, (loss_fn, weight) in self.inductive_losses.items(): 
             
-            x = preds[loss_name] 
+            x = preds[inductive_cls] 
 
             # compute and weigh
-            loss = loss_fn(x, labels["inductive"])
+            loss = loss_fn(x, labels["inductive"][inductive_cls])
             loss_weighted = loss * weight
             
             # collect stats
-            self.inductive_stats[loss_name]["unweighted"] = loss.detach().item()
-            self.inductive_stats[loss_name]["weighted"] = loss_weighted.detach().item()
+            self.inductive_stats[inductive_cls]["unweighted"] = loss.detach().item()
+            self.inductive_stats[inductive_cls]["weighted"] = loss_weighted.detach().item()
             total_loss += loss_weighted
+        return total_loss
             
 
 class TripletMarginLoss(nn.Module):
