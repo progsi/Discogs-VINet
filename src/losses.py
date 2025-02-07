@@ -74,15 +74,26 @@ class WeightedMultiloss(nn.Module):
     """
     def __init__(self, loss_config: dict):
         super(WeightedMultiloss, self).__init__()
-        
-        self.losses = {}  # Store (loss_fn, weight)
-        self.loss_stats = {} # to store current loss stats
 
+        assert "inductive" not in loss_config.keys(), "Must use WeightedMultilossInductive for inductive losses!"
+        self.losses, self.loss_stats = self._init_losses(loss_config)
+    
+    def _init_losses(self, loss_config: dict, name_key: str = False):
+        losses = {}
+        loss_stats = {}
         for loss_name, loss_params in loss_config.items():
-            loss_fn = init_single_loss(loss_name, loss_params)
+            if name_key:
+                name = loss_params[name_key] # for inductive
+            else:
+                name = loss_name
+            loss_fn = init_single_loss(name, loss_params)
             weight = loss_params.get('WEIGHT', 1.0)
-            self.losses[loss_name] = (loss_fn, weight)
-            self.loss_stats[loss_name] = {}
+            losses[name] = (loss_fn, weight)
+            loss_stats[name] = {}
+        return losses, loss_stats
+            
+    def get_stats(self):
+        return self.loss_stats
     
     def forward(self, preds: Dict[str, torch.Tensor], labels: torch.Tensor) -> torch.Tensor:
         """Calculates Multiloss.
@@ -109,8 +120,36 @@ class WeightedMultiloss(nn.Module):
             total_loss += loss_weighted   
         return total_loss
     
-    def get_stats(self):
-        return self.loss_stats
+class WeightedMultilossInductive(WeightedMultiloss):
+    def __init__(self, loss_config: dict):
+        super(WeightedMultilossInductive, self).__init__(loss_config.pop("inductive"))
+        self.inductive_losses, self.inductive_stats = self._init_losses(
+            loss_config["inductive"], name_key="INDUCTIVE_CLS")
+        
+    def forward(self, preds: Dict[str, torch.Tensor], labels: Dict[str,torch.Tensor]) -> torch.Tensor:
+        """Calculates Multiloss.
+        Args:
+            preds (Union[torch.Tensor, Dict[str, torch.Tensor]]): Mapping of loss names to predictions (embeddings or cls) per loss
+            labels (torch.Tensor): Target labels.
+        Returns:
+            torch.Tensor: total loss
+        """
+        
+        total_loss = super().forward(preds, labels["cls"])
+        # TODO: must implement properly here!
+        for loss_name, (loss_fn, weight) in self.inductive_losses.items(): 
+            
+            x = preds[loss_name] 
+
+            # compute and weigh
+            loss = loss_fn(x, labels["inductive"])
+            loss_weighted = loss * weight
+            
+            # collect stats
+            self.inductive_stats[loss_name]["unweighted"] = loss.detach().item()
+            self.inductive_stats[loss_name]["weighted"] = loss_weighted.detach().item()
+            total_loss += loss_weighted
+            
 
 class TripletMarginLoss(nn.Module):
     """A class to compute the triplet loss for given embeddings. 

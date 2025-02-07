@@ -1,12 +1,17 @@
 import json
 import pathlib
-from typing import Tuple
+from typing import Tuple, List, Dict
 import random
 
 import numpy as np
 import torch
 
 from .dataset import BaseDataset
+
+GENRES_KEY = "released_genres"
+STYLES_KEY = "released_styles"
+COUNTRY_KEY = "country"
+YEAR_KEY = "released"  
 
 class TrainDataset(BaseDataset):
     """Training dataset.
@@ -122,7 +127,10 @@ class TrainDataset(BaseDataset):
                 self.versions.append(version)
         
         self.transform = transform
-     
+    
+    def get_feature_dir(self, feature_id: str) -> pathlib.Path:
+        return self.features_dir / feature_id[:2]
+        
     def __getitem__(self, index) -> Tuple[torch.Tensor, list]:
         """Get self.samples_per_clique random anchor versions from a given clique.
 
@@ -143,7 +151,7 @@ class TrainDataset(BaseDataset):
         # Get feature
         version = self.versions[index]
         
-        feature_dir = self.features_dir / version["youtube_id"][:2]
+        feature_dir = self.get_feature_dir(version["youtube_id"])
         feature = self.load_cqt(feature_dir=feature_dir, feature_id=version["youtube_id"], 
                                 min_length=self.min_length, max_length=self.max_length)
         
@@ -185,3 +193,109 @@ class TrainDataset(BaseDataset):
         labels = torch.tensor([item[1] for item in items])
 
         return features, labels
+
+
+class RichTrainDataset(TrainDataset):
+    """Class for the rich training dataset for inductive transfer learning.
+    Args:
+        cliques_json_path (str): 
+        features_dir (str): 
+        max_length (int): 
+        min_length (int, optional): . Defaults to None.
+        mean_downsample_factor (int, optional): . Defaults to 20.
+        cqt_bins (int, optional): . Defaults to 84.
+        scale (str, optional): . Defaults to "norm".
+        clique_usage_ratio (float, optional): . Defaults to 1.0.
+        transform (torch.nn.Transform, optional): . Defaults to None.
+        genre_label_strategy (str, optional): . Defaults to "random". Other options: "first", "multilabel", "smooth".
+        style_label_strategy (str, optional): . Defaults to None. Other options: "first", "multilabel", "smooth".
+        country_label_strategy (str, optional): . Defaults to None.
+        released_label_strategy (str, optional): . Defaults to None.
+    """
+    def __init__(
+        self,
+        cliques_json_path: str,
+        features_dir: str,
+        max_length: int,
+        min_length: int = None,
+        mean_downsample_factor: int = 20,
+        cqt_bins: int = 84,
+        scale: str = "norm",
+        clique_usage_ratio: float = 1.0,
+        transform=None,
+        genre_label_strategy: str = "random",
+        style_label_strategy: str = None,
+        country_label: str = None,
+        year_label: str = None 
+    ) -> None:
+        super().__init__(cliques_json_path, features_dir, max_length, min_length, mean_downsample_factor, cqt_bins, scale, clique_usage_ratio, transform)
+
+        self.genre_label_strategy = genre_label_strategy
+        self.style_label_strategy = style_label_strategy
+        self.country_label_strategy = country_label
+        self.year_label_strategy = year_label
+        
+        self.GENRES_KEY = GENRES_KEY
+        self.STYLES_KEY = STYLES_KEY
+        self.COUNTRY_KEY = COUNTRY_KEY
+        self.YEAR_KEY = YEAR_KEY       
+        
+        self.cls_to_ids = {}
+        if self.genre_label_strategy:
+            self.cls_to_ids[self.GENRES_KEY] = self._init_genre_style_dict(self.GENRES_KEY)
+        if self.style_label_strategy:
+            self.cls_to_ids[self.STYLES_KEY] = self._init_genre_style_dict(self.STYLES_KEY)
+        if self.country_label_strategy:
+            self.cls_to_ids[self.COUNTRY_KEY] = self._init_country_dict(self.COUNTRY_KEY)
+    
+    def __getitem__(self, index) -> Tuple[torch.Tensor, list]:
+        
+        version = self.versions[index]
+        feature, label = super().__getitem__(index)
+        
+        labels = {}
+        labels["cls"] = label
+        
+        if self.genre_label_strategy:
+            labels[self.GENRES_KEY] = self.get_cls_id(version, self.GENRES_KEY, self.genre_label_strategy)
+        if self.style_label_strategy:
+            labels[self.STYLES_KEY] = self.get_cls_id(version, self.STYLES_KEY, self.style_label_strategy)
+        if self.country_label_strategy:
+            labels[self.COUNTRY_KEY] = self.cls_to_ids[self.COUNTRY_KEY][version[self.COUNTRY_KEY]]
+        if self.year_label_strategy:
+            labels[self.YEAR_KEY] = version[self.YEAR_KEY]
+        
+        return feature, labels
+        
+    def _init_genre_style_dict(self, key: str) -> Dict[str, int]:
+        values = {}
+        cls_id = 0
+        for version in self.versions:
+            vs = version[key]
+            for v in vs:
+                if not v in values:
+                    values[v] = cls_id
+                    cls_id += 1
+        return values
+    
+    def _init_country_dict(self, key: str) -> Dict[str, int]:
+        values = {}
+        cls_id = 0
+        for version in self.versions:
+            v = version[key]
+            if not v in values:
+                values[v] = cls_id
+                cls_id += 1
+        return values
+    
+    def get_cls_id(self, version: Dict[str, any], key: str, strategy: str) -> int:
+        items = version[key]
+        if strategy == "random":
+            item = random.choice(items)
+        elif strategy == "first":
+            item = items[0]
+        elif strategy == "multilabel" or strategy == "smooth":
+            raise NotImplementedError(f"Strategy {strategy} not implemented.")
+        else:
+            raise ValueError(f"Unknown strategy: {strategy}")
+        return self.cls_to_ids[key][item]
