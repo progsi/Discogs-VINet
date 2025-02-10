@@ -18,7 +18,7 @@ from evaluate import evaluate
 from src.dataset import TrainDataset, TestDataset, RichTrainDataset
 from src.utils import load_model, save_model
 from src.utilities.utils import format_time
-from src.losses import WeightedMultiloss
+from src.losses import WeightedMultiloss, WeightedMultilossInductive
 from src.dataset.augmentation import SpecAug
 
 SEED = 27  # License plate code of Gaziantep, gastronomical capital of Türkiye
@@ -64,8 +64,9 @@ def train_epoch(
                 f"[{(i+1):>{len(str(len(loader)))}}/{len(loader)}], Batch Loss: {loss.item():.4f}"
             )
             # if MultiLoss, also record individual losses
-            if isinstance(loss_func, WeightedMultiloss) and wandb.run is not None:
+            if (isinstance(loss_func, WeightedMultiloss) or isinstance(loss_func, WeightedMultilossInductive)) and wandb.run is not None:
                 wandb.log(loss_func.get_stats())
+
 
     if scheduler is not None:
         scheduler.step()

@@ -151,7 +151,9 @@ class WeightedMultilossInductive(WeightedMultiloss):
             self.inductive_stats[inductive_cls]["weighted"] = loss_weighted.detach().item()
             total_loss += loss_weighted
         return total_loss
-            
+    
+    def get_stats(self):
+        return {**self.loss_stats, **self.inductive_stats}
 
 class TripletMarginLoss(nn.Module):
     """A class to compute the triplet loss for given embeddings. 
