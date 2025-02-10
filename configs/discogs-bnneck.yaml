@@ -21,7 +21,7 @@ TRAIN:
   MAX_LENGTH: 7600 # Number of frames to consider as context, before downsampling.
   MIN_LENGTH: 4000 # required for cqtnet
   BATCH_SIZE: 216 # Number of versions in batch.
-  EPOCHS: 40 # Number of epochs to train.
+  EPOCHS: 200 # Number of epochs to train.
   LOSS:
     PROTOTYPICAL:
       WEIGHT: 1.0

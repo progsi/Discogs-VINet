@@ -20,7 +20,7 @@ TRAIN:
   SCALE: normalize # ['normalize', 'upscale']
   MAX_LENGTH: 7600 # Number of frames to consider as context, before downsampling.
   BATCH_SIZE: 216 # Number of versions in batch.
-  EPOCHS: 40 # Number of epochs to train.
+  EPOCHS: 200 # Number of epochs to train.
   LOSS:
     PROTOTYPICAL:
       WEIGHT: 1.0
@@ -40,10 +40,11 @@ TRAIN:
     SOFTMAX:
       LABEL_SMOOTHING: 0.1
       OUTPUT_DIM: 76_775 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.
-    SOFTMAX:
-      INDUCTIVE_CLS: GENRE
-      LABEL_SMOOTHING: 0.1
-      OUTPUT_DIM: 13 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.
+    INDUCTIVE:
+      SOFTMAX:
+        INDUCTIVE_CLS: GENRE
+        LABEL_SMOOTHING: 0.1
+        OUTPUT_DIM: 13 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.
   OPTIMIZER: Adam # ['Adam', 'AdamW']
   AUTOMATIC_MIXED_PRECISION: True # Use mixed precision training.
   LR:

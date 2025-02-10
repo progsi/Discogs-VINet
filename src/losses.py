@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from src.utilities.tensor_op import pairwise_distance_matrix, create_pos_neg_masks
 
+INDUCTIVE_KEY = "INDUCTIVE"
 TRIPLET_LOSS = 'triplet'
 CENTER_LOSS = 'center'
 SOFTMAX_LOSS = 'softmax'
@@ -47,7 +48,10 @@ def init_loss(loss_config: dict) -> Type[nn.Module]:
         loss_name, loss_params = list(loss_config.items())[0]
         return init_single_loss(loss_name, loss_params)
     else:
-        return WeightedMultiloss(loss_config)
+        if INDUCTIVE_KEY in loss_config.keys():
+            return WeightedMultilossInductive(loss_config)
+        else:
+            return WeightedMultiloss(loss_config)
 
 def is_cls_loss(loss_name: str) -> bool:
     """Check if the loss is a classification loss.
@@ -75,21 +79,19 @@ class WeightedMultiloss(nn.Module):
     def __init__(self, loss_config: dict):
         super(WeightedMultiloss, self).__init__()
 
-        assert "inductive" not in loss_config.keys(), "Must use WeightedMultilossInductive for inductive losses!"
+        assert INDUCTIVE_KEY not in loss_config.keys(), "Must use WeightedMultilossInductive for inductive losses!"
         self.losses, self.loss_stats = self._init_losses(loss_config)
     
-    def _init_losses(self, loss_config: dict, name_key: str = False):
+    def _init_losses(self, loss_config: dict):
         losses = {}
         loss_stats = {}
-        for loss_name, loss_params in loss_config.items():
-            if name_key:
-                name = loss_params[name_key] # for inductive
-            else:
-                name = loss_name
-            loss_fn = init_single_loss(name, loss_params)
+        for key, loss_params in loss_config.items():
+            name_key = loss_params.get('NAME_KEY', None)
+            init_name = name_key if name_key else key
+            loss_fn = init_single_loss(init_name, loss_params)
             weight = loss_params.get('WEIGHT', 1.0)
-            losses[name] = (loss_fn, weight)
-            loss_stats[name] = {}
+            losses[key] = (loss_fn, weight)
+            loss_stats[key] = {}
         return losses, loss_stats
             
     def get_stats(self):
@@ -122,10 +124,9 @@ class WeightedMultiloss(nn.Module):
     
 class WeightedMultilossInductive(WeightedMultiloss):
     def __init__(self, loss_config: dict):
-        super(WeightedMultilossInductive, self).__init__(loss_config.pop("inductive"))
-        self.inductive_losses, self.inductive_stats = self._init_losses(
-            loss_config["inductive"], 
-            name_key="INDUCTIVE_CLS")
+        loss_config_inductive = loss_config[INDUCTIVE_KEY]
+        super(WeightedMultilossInductive, self).__init__(loss_config.pop(INDUCTIVE_KEY))
+        self.inductive_losses, self.inductive_stats = self._init_losses(loss_config_inductive)
         
     def forward(self, preds: Dict[str, torch.Tensor], labels: Dict[str,torch.Tensor]) -> torch.Tensor:
         """Calculates Multiloss.
@@ -143,7 +144,7 @@ class WeightedMultilossInductive(WeightedMultiloss):
             x = preds[inductive_cls] 
 
             # compute and weigh
-            loss = loss_fn(x, labels["inductive"][inductive_cls])
+            loss = loss_fn(x, labels[INDUCTIVE_KEY.lower()][inductive_cls])
             loss_weighted = loss * weight
             
             # collect stats

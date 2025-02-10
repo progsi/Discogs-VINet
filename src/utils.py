@@ -9,7 +9,7 @@ from src.nets.cqtnet import CQTNet
 from src.nets.coverhunter import CoverHunter
 from src.nets.lyracnet import LyraCNet
 from src.nets.versegnet import VerSegNet
-from src.losses import init_loss, WeightedMultiloss
+from src.losses import init_loss, WeightedMultiloss, WeightedMultilossInductive, INDUCTIVE_KEY
 from src.lr_schedulers import (
     CosineAnnealingWarmRestartsWithWarmup,
     WarmupPiecewiseConstantScheduler,
@@ -29,7 +29,14 @@ def count_model_parameters(model, verbose: bool = True) -> Tuple[int, int]:
 
     return grad_params, non_grad_params
 
-
+def get_inductive_heads_dict(config: dict) -> dict:
+    """Returns the inductive heads dictionary."""
+    if config.get(INDUCTIVE_KEY):
+        d = {
+            k: v["OUTPUT_DIM"] for k, v in config[INDUCTIVE_KEY].items()
+        }
+    return d
+    
 def build_model_with_loss(config: dict, device: str) -> Tuple[torch.nn.Module, torch.nn.Module]:
     """builds model and loss.
     Args:
@@ -43,12 +50,14 @@ def build_model_with_loss(config: dict, device: str) -> Tuple[torch.nn.Module, t
         # Init Loss
     loss_config = config["TRAIN"]["LOSS"]
     
+    inductive_heads = get_inductive_heads_dict(loss_config)
     loss_func = init_loss(loss_config)
     
-    assert not (
-        isinstance(loss_func, WeightedMultiloss) and 
-        config["MODEL"]["NECK"] != "bnneck"), "WeightedMultiloss only works with BNNeck"
-    
+    if config["MODEL"]["ARCHITECTURE"].upper() != "LYRACNET":
+        assert not (
+            (isinstance(loss_func, WeightedMultiloss) or isinstance(loss_func, WeightedMultilossInductive))and 
+            config["MODEL"]["NECK"] != "bnneck"), "WeightedMultiloss only works with BNNeck"
+        
     if config["MODEL"]["ARCHITECTURE"].upper() == "CQTNET":
         model = CQTNet(
             ch_in=config["MODEL"]["CONV_CHANNEL"],
@@ -76,7 +85,8 @@ def build_model_with_loss(config: dict, device: str) -> Tuple[torch.nn.Module, t
             num_blocks=config["MODEL"]["NUM_BLOCKS"],
             widen_factor=config["MODEL"]["WIDEN_FACTOR"],
             neck="bnneck",
-            loss_config=loss_config
+            loss_config=loss_config,
+            inductive_heads=inductive_heads
             ).to(device)
     elif config["MODEL"]["ARCHITECTURE"].upper() == "VERSEGNET":
         model = VerSegNet(
@@ -207,7 +217,7 @@ def load_model(config: dict, device: str, mode="train"):
 
         if config["TRAIN"]["AUTOMATIC_MIXED_PRECISION"]:
             print("\033[32mUsing Automatic Mixed Precision...\033[0m")
-            scaler = torch.cuda.amp.GradScaler()
+            scaler = torch.amp.GradScaler("cuda")
         else:
             print("Using full precision...")
             scaler = None

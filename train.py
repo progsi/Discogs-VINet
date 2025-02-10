@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader
 from pytorch_metric_learning import samplers
 
 from evaluate import evaluate
-from src.dataset import TrainDataset, TestDataset
+from src.dataset import TrainDataset, TestDataset, RichTrainDataset
 from src.utils import load_model, save_model
 from src.utilities.utils import format_time
 from src.losses import WeightedMultiloss
@@ -176,16 +176,22 @@ if __name__ == "__main__":
     else:
         transform = None
     
-    train_dataset = TrainDataset(
-        config["TRAIN"]["TRAIN_CLIQUES"],
-        config["TRAIN"]["FEATURES_DIR"],
-        max_length=config["TRAIN"]["MAX_LENGTH"],
-        min_length=config["TRAIN"].get("MIN_LENGTH"),
-        mean_downsample_factor=config["MODEL"]["DOWNSAMPLE_FACTOR"],
-        clique_usage_ratio=config["TRAIN"]["CLIQUE_USAGE_RATIO"],
-        scale=config["TRAIN"]["SCALE"],
-        transform=transform
-    )
+    train_args = {
+        "cliques_json_path": config["TRAIN"]["TRAIN_CLIQUES"],
+        "features_dir": config["TRAIN"]["FEATURES_DIR"],
+        "max_length": config["TRAIN"]["MAX_LENGTH"],
+        "min_length": config["TRAIN"].get("MIN_LENGTH"),
+        "mean_downsample_factor": config["MODEL"]["DOWNSAMPLE_FACTOR"],
+        "clique_usage_ratio": config["TRAIN"]["CLIQUE_USAGE_RATIO"],
+        "scale": config["TRAIN"]["SCALE"],
+        "transform": transform
+    }
+    if config["TRAIN"]["TRAIN_CLIQUES"].endswith(".rich.json"): # TODO: make this prettier
+        inductive_losses = config["TRAIN"]["LOSS"]["INDUCTIVE"]
+        genre_strategy = config["TRAIN"]["LOSS"]["INDUCTIVE"]["SOFTMAX"].get("STRATEGY")
+        train_dataset = RichTrainDataset(**train_args)
+    else:
+        train_dataset = TrainDataset(**train_args)
     
     sampler = samplers.MPerClassSampler(train_dataset.labels,
                                       batch_size=config["TRAIN"]["BATCH_SIZE"], 

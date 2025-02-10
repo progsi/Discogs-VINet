@@ -70,13 +70,13 @@ class LyraCNet(nn.Module):
                  loss_config: Dict[str,Union[int,str]] = None,
                  dropout: float = 0.0, 
                  dense_dropout: float = 0.0,
-                 indictive_heads: Dict[str,int] = None):
+                 inductive_heads: Dict[str,int] = None):
         super(LyraCNet, self).__init__()
         
         assert not (neck == "bnneck" and loss_config is None), "BNNeck requires loss_config!"
         self.num_blocks = num_blocks
         self.embed_dim = embed_dim
-        self.indictive_heads = indictive_heads is not None
+        self.inductive_heads = inductive_heads is not None
         
         nChannels = [16]
         for i in range(num_blocks):
@@ -103,9 +103,9 @@ class LyraCNet(nn.Module):
         self.drop = nn.Dropout(dense_dropout)        
         self.pooling = GeM() # flattening necessary?
         
-        if self.indictive_heads:
+        if self.inductive_heads:
             self.inductive_heads = nn.ModuleDict()
-            for label, num_classes in indictive_heads.items():
+            for label, num_classes in inductive_heads.items():
                 self.inductive_heads[label] = nn.Linear(nChannels[-1], num_classes)
         
         if neck != "bnneck":
@@ -137,12 +137,12 @@ class LyraCNet(nn.Module):
         x = self.pooling(x)
         x = x.view(-1, self.nChannels)
         
-        out = self.neck(x)
+        out_tensor, out_dict = self.neck(x)
         
-        if self.indictive_heads:
+        if self.inductive_heads:
             for label, head in self.inductive_heads.items():
-                out[label] = head(x)
+                out_dict[label] = head(x)
         
-        return out
+        return out_tensor, out_dict
 
 
