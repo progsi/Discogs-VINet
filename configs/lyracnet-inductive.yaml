@@ -46,12 +46,12 @@ TRAIN:
       SOFTMAX:
         LABEL_SMOOTHING: 0.1
         OUTPUT_DIM: 76_775 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.
-      INDUCTIVE:
-        GENRE:
-          LOSS_NAME: SOFTMAX
-          STRATEGY: random # ["random", "first", "multilabel", "smooth"]
-          LABEL_SMOOTHING: 0.1
-          OUTPUT_DIM: 13 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.
+    LOSS_INDUCTIVE:
+      GENRE:
+        LOSS_NAME: SOFTMAX
+        STRATEGY: random # ["random", "first", "multilabel", "smooth"]
+        LABEL_SMOOTHING: 0.1
+        OUTPUT_DIM: 13 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.
     OPTIMIZER: Adam # ['Adam', 'AdamW']
     WEIGHT_DECAY: 0.00001 
     AUTOMATIC_MIXED_PRECISION: True # Use mixed precision training.

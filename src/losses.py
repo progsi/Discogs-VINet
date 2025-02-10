@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from src.utilities.tensor_op import pairwise_distance_matrix, create_pos_neg_masks
 
-INDUCTIVE_KEY = "INDUCTIVE"
+INDUCTIVE_KEY = "LOSS_INDUCTIVE"
 TRIPLET_LOSS = 'triplet'
 CENTER_LOSS = 'center'
 SOFTMAX_LOSS = 'softmax'
@@ -36,10 +36,11 @@ def init_single_loss(loss_name: str, loss_params: dict) -> Type[nn.Module]:
     elif loss_name == PROTOTYPICAL_LOSS.upper():
         return PrototypicalLoss(n_support=loss_params['N_SUPPORT'])
 
-def init_loss(loss_config: dict) -> Type[nn.Module]:
+def init_loss(loss_config: dict, loss_config_inductive: dict) -> Type[nn.Module]:
     """Initialize a loss function, either single loss or weihted Multiloss.
     Args:
         loss_config (dict): dictionary based on config file
+        loss_config_inductive (dict): dictionary based on config file
     Returns:
         Type[nn.Module]: initialized loss class
     """
@@ -48,8 +49,8 @@ def init_loss(loss_config: dict) -> Type[nn.Module]:
         loss_name, loss_params = list(loss_config.items())[0]
         return init_single_loss(loss_name, loss_params)
     else:
-        if INDUCTIVE_KEY in loss_config.keys():
-            return WeightedMultilossInductive(loss_config)
+        if loss_config_inductive:
+            return WeightedMultilossInductive(loss_config, loss_config_inductive)
         else:
             return WeightedMultiloss(loss_config)
 
@@ -79,7 +80,6 @@ class WeightedMultiloss(nn.Module):
     def __init__(self, loss_config: dict):
         super(WeightedMultiloss, self).__init__()
 
-        assert INDUCTIVE_KEY not in loss_config.keys(), "Must use WeightedMultilossInductive for inductive losses!"
         self.losses, self.loss_stats = self._init_losses(loss_config)
     
     def _init_losses(self, loss_config: dict):
@@ -123,9 +123,8 @@ class WeightedMultiloss(nn.Module):
         return total_loss
     
 class WeightedMultilossInductive(WeightedMultiloss):
-    def __init__(self, loss_config: dict):
-        loss_config_inductive = loss_config[INDUCTIVE_KEY]
-        super(WeightedMultilossInductive, self).__init__(loss_config.pop(INDUCTIVE_KEY))
+    def __init__(self, loss_config: dict, loss_config_inductive: dict):
+        super(WeightedMultilossInductive, self).__init__(loss_config)
         self.inductive_losses, self.inductive_stats = self._init_losses(loss_config_inductive)
         
     def forward(self, preds: Dict[str, torch.Tensor], labels: Dict[str,torch.Tensor]) -> torch.Tensor:

@@ -29,13 +29,6 @@ def count_model_parameters(model, verbose: bool = True) -> Tuple[int, int]:
 
     return grad_params, non_grad_params
 
-def get_inductive_heads_dict(config: dict) -> dict:
-    """Returns the inductive heads dictionary."""
-    if config.get(INDUCTIVE_KEY):
-        d = {
-            k: v["OUTPUT_DIM"] for k, v in config[INDUCTIVE_KEY].items()
-        }
-    return d
     
 def build_model_with_loss(config: dict, device: str) -> Tuple[torch.nn.Module, torch.nn.Module]:
     """builds model and loss.
@@ -49,9 +42,10 @@ def build_model_with_loss(config: dict, device: str) -> Tuple[torch.nn.Module, t
     """
         # Init Loss
     loss_config = config["TRAIN"]["LOSS"]
+    loss_config_inductive = config["TRAIN"].get("LOSS_INDUCTIVE")
     
-    inductive_heads = get_inductive_heads_dict(loss_config)
-    loss_func = init_loss(loss_config)
+    inductive_heads = {k: v["OUTPUT_DIMS"] for (k,v) in loss_config_inductive.items()} if loss_config_inductive else None
+    loss_func = init_loss(loss_config, loss_config_inductive)
     
     if config["MODEL"]["ARCHITECTURE"].upper() != "LYRACNET":
         assert not (
