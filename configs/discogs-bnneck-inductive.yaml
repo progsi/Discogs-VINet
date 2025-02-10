@@ -42,7 +42,7 @@ TRAIN:
       OUTPUT_DIM: 76_775 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.
   LOSS_INDUCTIVE:
     SOFTMAX:
-      INDUCTIVE_CLS: GENRE
+      INDUCTIVE_CLS: RELEASE_GENRES
       LABEL_SMOOTHING: 0.1
       OUTPUT_DIM: 13 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.
   OPTIMIZER: Adam # ['Adam', 'AdamW']

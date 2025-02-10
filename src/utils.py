@@ -44,7 +44,7 @@ def build_model_with_loss(config: dict, device: str) -> Tuple[torch.nn.Module, t
     loss_config = config["TRAIN"]["LOSS"]
     loss_config_inductive = config["TRAIN"].get("LOSS_INDUCTIVE")
     
-    inductive_heads = {k: v["OUTPUT_DIMS"] for (k,v) in loss_config_inductive.items()} if loss_config_inductive else None
+    inductive_heads = {k: v["OUTPUT_DIM"] for (k,v) in loss_config_inductive.items()} if loss_config_inductive else None
     loss_func = init_loss(loss_config, loss_config_inductive)
     
     if config["MODEL"]["ARCHITECTURE"].upper() != "LYRACNET":
@@ -80,7 +80,7 @@ def build_model_with_loss(config: dict, device: str) -> Tuple[torch.nn.Module, t
             widen_factor=config["MODEL"]["WIDEN_FACTOR"],
             neck="bnneck",
             loss_config=loss_config,
-            inductive_heads=inductive_heads
+            loss_config_inductive=loss_config_inductive
             ).to(device)
     elif config["MODEL"]["ARCHITECTURE"].upper() == "VERSEGNET":
         model = VerSegNet(

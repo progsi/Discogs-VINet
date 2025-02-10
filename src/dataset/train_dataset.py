@@ -8,8 +8,8 @@ import torch
 
 from .dataset import BaseDataset
 
-GENRES_KEY = "released_genres"
-STYLES_KEY = "released_styles"
+GENRES_KEY = "release_genres"
+STYLES_KEY = "release_styles"
 COUNTRY_KEY = "country"
 YEAR_KEY = "released"  
 
@@ -223,17 +223,16 @@ class RichTrainDataset(TrainDataset):
         scale: str = "norm",
         clique_usage_ratio: float = 1.0,
         transform=None,
-        genre_label_strategy: str = "random",
-        style_label_strategy: str = None,
-        country_label: str = None,
-        year_label: str = None 
+        loss_config_inductive: Dict[str, any] = None
     ) -> None:
         super().__init__(cliques_json_path, features_dir, max_length, min_length, mean_downsample_factor, cqt_bins, scale, clique_usage_ratio, transform)
 
-        self.genre_label_strategy = genre_label_strategy
-        self.style_label_strategy = style_label_strategy
-        self.country_label_strategy = country_label
-        self.year_label_strategy = year_label
+        assert loss_config_inductive is not None, "Inductive transfer requires loss_config_inductive"
+        
+        self.genre_label_strategy = loss_config_inductive[GENRES_KEY.upper()]["STRATEGY"]
+        self.style_label_strategy = None
+        self.country_label_strategy = None
+        self.year_label_strategy = None
         
         self.GENRES_KEY = GENRES_KEY
         self.STYLES_KEY = STYLES_KEY
@@ -299,3 +298,34 @@ class RichTrainDataset(TrainDataset):
         else:
             raise ValueError(f"Unknown strategy: {strategy}")
         return self.cls_to_ids[key][item]
+    
+    
+    @staticmethod
+    def collate_fn(items) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Collate function for the dataset. 
+        Parameters:
+        -----------
+        items: list
+            List of tuples containing the features and labels of the versions
+
+        Returns:
+        --------
+        features: torch.Tensor
+            The CQT features of the anchors, shape=(B, F, T), dtype=float32
+            F is the number of CQT bins.
+            T is the downsampled max_length,
+        labels: torch.Tensor
+            1D tensor of the clique labels, shape=(B,)
+        """
+        
+        # padding
+        max_length = max(item[0].shape[1] for item in items)
+        padded_features = [
+            torch.nn.functional.pad(item[0], (0, max_length - item[0].shape[1])) for item in items
+        ]
+        
+        features = torch.stack(padded_features)
+        keys = items[0][1].keys()
+        labels = {k: torch.tensor([item[1][k] for item in items]) for k in keys}
+
+        return features, labels

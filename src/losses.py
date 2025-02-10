@@ -86,7 +86,7 @@ class WeightedMultiloss(nn.Module):
         losses = {}
         loss_stats = {}
         for key, loss_params in loss_config.items():
-            name_key = loss_params.get('NAME_KEY', None)
+            name_key = loss_params.get('LOSS_NAME', None)
             init_name = name_key if name_key else key
             loss_fn = init_single_loss(init_name, loss_params)
             weight = loss_params.get('WEIGHT', 1.0)
@@ -143,7 +143,7 @@ class WeightedMultilossInductive(WeightedMultiloss):
             x = preds[inductive_cls] 
 
             # compute and weigh
-            loss = loss_fn(x, labels[INDUCTIVE_KEY.lower()][inductive_cls])
+            loss = loss_fn(x, labels[inductive_cls.lower()])
             loss_weighted = loss * weight
             
             # collect stats

@@ -20,8 +20,8 @@ MODEL :
 TRAIN:
     # Train and Validation, and Augmentation directories
     FEATURES_DIR: /data/audio/cqt/
-    TRAIN_CLIQUES: /data/discogs/Discogs-VI-YT-20240701-light.json.train
-    VALIDATION_CLIQUES: /data/discogs/Discogs-VI-YT-20240701-light.json.val
+    TRAIN_CLIQUES: /data/discogs/Discogs-VI-YT-20240701-light.json.train.rich
+    VALIDATION_CLIQUES: /data/discogs/Discogs-VI-YT-20240701-light.json.val.rich
     M_PER_CLASS: 8 # Number of versions per clique during a training iteration.
     SCALE: null # ['normalize', 'upscale']
     MAX_LENGTH: 7600 # Number of frames to consider as context, before downsampling.
@@ -47,7 +47,7 @@ TRAIN:
         LABEL_SMOOTHING: 0.1
         OUTPUT_DIM: 76_775 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.
     LOSS_INDUCTIVE:
-      GENRE:
+      RELEASE_GENRES: # must be key like in Discogs dataset
         LOSS_NAME: SOFTMAX
         STRATEGY: random # ["random", "first", "multilabel", "smooth"]
         LABEL_SMOOTHING: 0.1

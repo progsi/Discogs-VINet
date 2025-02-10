@@ -41,7 +41,7 @@ def train_epoch(
     losses = []
     for i, (features, labels) in enumerate(tqdm(loader)):
         features = features.unsqueeze(1).to(device)  # (B,F,T) -> (B,1,F,T)
-        labels = labels.to(device)  # (B,)
+        labels = {k: v.to(device) for (k, v) in labels.items()} if isinstance(labels, dict) else labels.to(device) # (B,)
         optimizer.zero_grad()  # TODO set_to_none=True?
         
         with torch.autocast(device_type=device.type, dtype=torch.float16, enabled=amp):
@@ -51,7 +51,6 @@ def train_epoch(
             
             loss = loss_func(embs, labels)
 
-                
         if amp:
             scaler.scale(loss).backward()  # type: ignore
             scaler.step(optimizer)
@@ -186,10 +185,9 @@ if __name__ == "__main__":
         "scale": config["TRAIN"]["SCALE"],
         "transform": transform
     }
-    if config["TRAIN"]["TRAIN_CLIQUES"].endswith(".rich.json"): # TODO: make this prettier
-        inductive_losses = config["TRAIN"]["LOSS"]["INDUCTIVE"]
-        genre_strategy = config["TRAIN"]["LOSS"]["INDUCTIVE"]["SOFTMAX"].get("STRATEGY")
-        train_dataset = RichTrainDataset(**train_args)
+    loss_config_inductive = config["TRAIN"].get("LOSS_INDUCTIVE")
+    if loss_config_inductive:
+        train_dataset = RichTrainDataset(**train_args, loss_config_inductive=loss_config_inductive)
     else:
         train_dataset = TrainDataset(**train_args)
     
