@@ -1,5 +1,5 @@
 MODEL :
-  NAME: LyraCNet-Inductive
+  NAME: LyraCNet-Original
   # Model
   ARCHITECTURE: lyracnet
   EMBEDDING_SIZE: 1024 
@@ -16,26 +16,24 @@ MODEL :
 TRAIN:
     # Train and Validation, and Augmentation directories
     FEATURES_DIR: /data/audio/cqt/
-    TRAIN_CLIQUES: /data/discogs/Discogs-VI-YT-20240701-light.json.train.rich
-    VALIDATION_CLIQUES: /data/discogs/Discogs-VI-YT-20240701-light.json.val.rich
-    M_PER_CLASS: 6 # Number of versions per clique during a training iteration.
+    TRAIN_CLIQUES: /data/discogs/Discogs-VI-YT-20240701-light.json.train
+    VALIDATION_CLIQUES: /data/discogs/Discogs-VI-YT-20240701-light.json.val
+    M_PER_CLASS: 4 # Number of versions per clique during a training iteration.
     SCALE: null # ['normalize', 'upscale']
-    MAX_LENGTH: 8000 # Number of frames to consider as context, before downsampling.
-    MIN_LENGTH: 4000
-    BATCH_SIZE: 384 # Number of versions in batch.
+    MAX_LENGTH: 7750 # Number of frames to consider as context, before downsampling.
+    MIN_LENGTH: 4430 
+    BATCH_SIZE: 216 # Number of versions in batch.
     EPOCHS: 200 # Number of epochs to train.
     AUGMENTATION:
-      F: 30
-      NOISE_STD: 0.01
-      NUM_FREQ_MASKS: 2
-      NUM_TIME_MASKS: 2
-      P_NOISE: 0.5
+      F: 27
+      NUM_FREQ_MASKS: 1
+      NUM_TIME_MASKS: 1
       REPLACE_WITH_ZERO: false
-      T: 40
+      T: 100
     LOSS:
       PROTOTYPICAL:
         WEIGHT: 1.0
-        N_SUPPORT: 3
+        N_SUPPORT: 2
       TRIPLET:
         WEIGHT: 1 # Weight of the loss.
         MARGIN: 0.2 # Triplet loss margin
@@ -51,21 +49,14 @@ TRAIN:
       SOFTMAX:
         LABEL_SMOOTHING: 0.1
         OUTPUT_DIM: 76_775 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.
-    LOSS_INDUCTIVE:
-      RELEASE_GENRES: # must be key like in Discogs dataset
-        LOSS_NAME: SOFTMAX
-        STRATEGY: random # ["random", "first", "multilabel", "smooth"]
-        LABEL_SMOOTHING: 0.1
-        OUTPUT_DIM: 13 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.
     OPTIMIZER: Adam # ['Adam', 'AdamW']
     WEIGHT_DECAY: 0.00001 
     AUTOMATIC_MIXED_PRECISION: True # Use mixed precision training.
     LR: # see https://github.com/Liu-Feng-deeplearning/CoverHunter/blob/main/egs/covers80/config/hparams.yaml
-      SCHEDULE: EXPONENTIAL-MIN_LR # ['NONE', 'STEP', 'MULTISTEP', 'EXPONENTIAL' 'EXPONENTIAL-MIN_LR', 'COSINE, LIN-WARMUP-PCWS'].
+      SCHEDULE: COSINE # ['NONE', 'STEP', 'MULTISTEP', 'EXPONENTIAL' 'EXPONENTIAL-MIN_LR', 'COSINE, LIN-WARMUP-PCWS'].
       LR: 0.001 
       PARAMS:
-        ETA_MIN: 0.0001 # from 
-        GAMMA: 0.9975
+        T_0: 40
     CUDA_DETERMINISTIC: False # Set to True for deterministic training.
     CUDA_BENCHMARK: False # Set to True for benchmarking.
     CLIQUE_USAGE_RATIO: 1.0 # Fraction of training data to use. Useful for debugging. 1.0 to use 100% of data.
