@@ -117,7 +117,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--wandb-project",
         type=str,
-        default="Berlin",
+        default="ISMIR2025",
         help="Wandb project name.",
     )
     args = parser.parse_args()
@@ -231,7 +231,6 @@ if __name__ == "__main__":
             lr_current = optimizer.param_groups[0]["lr"]
         wandb.log(
             {
-                "epoch": start_epoch - 1,
                 "lr": lr_current,
             }
         )
@@ -257,7 +256,6 @@ if __name__ == "__main__":
                 {
                     "train_loss": train_loss,
                     "train_time": t_train,
-                    "epoch": epoch,
                     "lr": lr_current,
                     # "difficult_triplets": triplet_stats, # TODO: other stats?
                 }
@@ -313,9 +311,9 @@ if __name__ == "__main__":
                     {
                         **metrics,
                         "eval_time": t_eval,
-                        "epoch": epoch,
                         "best_MAP": best_mAP,
-                    }
+                    },
+                    step=epoch
                 )
 
     print("===Training finished===")
