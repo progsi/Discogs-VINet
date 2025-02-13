@@ -1,3 +1,4 @@
+from typing import Tuple
 import numpy as np
 
 def mean_downsample_cqt(cqt: np.ndarray, mean_window_length: int) -> np.ndarray:
@@ -57,3 +58,88 @@ def normalize_cqt(cqt: np.ndarray) -> np.ndarray:
                 np.max(cqt) + 1e-6
             )
     return cqt
+
+def fft_mag(cqt: np.ndarray, n: int) -> Tuple[np.ndarray,np.ndarray]:
+    """Adopted from: https://github.com/zafarrafii/CQHC-Python/blob/master/cqhc.py
+    Args:
+        cqt (np.ndarray): CQT spectrogram
+        n (int): number of frequency channels
+    Returns:
+        Tuple[np.ndarray,np.ndarray]: fft, magnitude
+    """
+    # Compute the Fourier transform of every frame and their magnitude
+    fft = np.fft.fft(cqt, 2 * n - 1, axis=0)
+    mag = abs(fft)
+    return fft, mag
+
+def deconv_spectral(mag: np.ndarray, n: int) -> np.ndarray:
+    """Deconv. spectral component.
+    Args:
+        mag (np.ndarray): magnitude FFT
+        n (int): number of frequency channels
+    Returns:
+        np.ndarray: spectral component
+    """
+    return np.real(
+        np.fft.ifft(mag, axis=0)[0:n, :]
+    )
+    
+def deconv_pitch(fft: np.ndarray, mag: np.ndarray, n: int) -> np.ndarray:
+    """Deconv. pitch component.
+    Args:
+        fft (np.ndarray): 
+        mag (np.ndarray): 
+        n (int): 
+    Returns:
+        np.ndarray: 
+    """
+    return np.real(
+        np.fft.ifft(fft / (mag + 1e-16), axis=0)[
+            0:n, :])
+    
+def deconv_cqt(cqt: np.ndarray) -> Tuple[np.ndarray,np.ndarray]:
+    """Adopted from: https://github.com/zafarrafii/CQHC-Python/blob/master/cqhc.py
+    Deconvolve the constant-Q transform (CQT) spectrogram into a pitch-normalized spectral component and an energy-normalized pitch component.
+    Args:
+        cqt (np.ndarray): CQT spectrogram
+    Returns:
+        Tuple[np.ndarray,np.ndarray]: spectral CQT component, pitch CQT component
+    """
+    # Get the number of frequency channels
+    n = np.shape(cqt)[0]
+    fft, mag = fft_mag(cqt, n)
+
+    # Derive the spectral component 
+    s = deconv_spectral(mag, n)
+    # Derive the pitch component 
+    p = deconv_pitch(fft, mag, n)
+    return s, p
+
+def cqhc(
+    cqt: np.ndarray,
+    octave_resolution: int =12,
+    number_coefficients: int =20,
+):
+    """Adopted from: https://github.com/zafarrafii/CQHC-Python/blob/master/cqhc.py
+    Compute the constant-Q harmonic coefficients (CQHCs).
+    Args:
+        cqt (np.ndarray): CQT spectrogram
+        octave_resolution (int, optional): . Defaults to 12.
+        number_coefficients (int, optional): . Defaults to 20.
+    Returns:
+        np.ndarray: 
+    """
+    # Derive the spectral component
+    n = np.shape(cqt)[0]
+    _, mag = fft_mag(cqt, n)
+
+    # Derive the spectral component 
+    s = deconv_spectral(mag, n)
+    
+    # Extract the CQHCs
+    js = np.round(
+        octave_resolution * np.log2(np.arange(1, number_coefficients + 1))
+    ).astype(int)
+    s = s[js, :]
+
+    return s

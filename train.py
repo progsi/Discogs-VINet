@@ -117,7 +117,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--wandb-project",
         type=str,
-        default="Berlin",
+        default="ISMIR2025",
         help="Wandb project name.",
     )
     args = parser.parse_args()

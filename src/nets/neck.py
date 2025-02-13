@@ -47,7 +47,7 @@ class BNNeck(nn.Module):
         self.layers = self._init_layers()     
     
     def _init_layers(self) -> nn.ModuleDict:
-        """Initialize layers based on loss config input aad embedding dimension.
+        """Initialize layers based on loss config input and embedding dimension.
         Returns:
             nn.ModuleDict: dict. of layers
         """

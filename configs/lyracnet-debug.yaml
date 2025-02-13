@@ -39,12 +39,12 @@ TRAIN:
         NON_ZERO_MEAN: True # If true, the zero losses in the batch are filtered out before averaging.
       CENTER:
         WEIGHT: 0.001 # Weight of the loss.
-        NUM_CLS: 76_775 # Number of classes.
+        NUM_CLS: 80_017 # Number of classes.
         FEAT_DIM: 1024 # Embedding dimension
         SHARE_BN: True
       SOFTMAX:
         LABEL_SMOOTHING: 0.1
-        OUTPUT_DIM: 76_775 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.
+        OUTPUT_DIM: 80_017 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.
     OPTIMIZER: Adam # ['Adam', 'AdamW']
     WEIGHT_DECAY: 0.00001 
     AUTOMATIC_MIXED_PRECISION: True # Use mixed precision training.

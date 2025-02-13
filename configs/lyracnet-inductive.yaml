@@ -6,7 +6,6 @@ MODEL :
   DEPTH: 28 
   NUM_BLOCKS: 4
   WIDEN_FACTOR: 8
-  OUTPUT_CLS: 76_775 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.
   FREQUENCY_BINS: 84
   SAMPLE_RATE: 22050
   DOWNSAMPLE_FACTOR: 15 # might try out 20?
@@ -25,13 +24,11 @@ TRAIN:
     BATCH_SIZE: 384 # Number of versions in batch.
     EPOCHS: 200 # Number of epochs to train.
     AUGMENTATION:
-      F: 30
-      NOISE_STD: 0.01
-      NUM_FREQ_MASKS: 2
-      NUM_TIME_MASKS: 2
-      P_NOISE: 0.5
+      F: 27
+      NUM_FREQ_MASKS: 1
+      NUM_TIME_MASKS: 1
       REPLACE_WITH_ZERO: false
-      T: 40
+      T: 100
     LOSS:
       PROTOTYPICAL:
         WEIGHT: 1.0
@@ -45,12 +42,12 @@ TRAIN:
         NON_ZERO_MEAN: True # If true, the zero losses in the batch are filtered out before averaging.
       CENTER:
         WEIGHT: 0.001 # Weight of the loss.
-        NUM_CLS: 76_775 # Number of classes.
+        NUM_CLS: 80_017 # Number of classes.
         FEAT_DIM: 1024 # Embedding dimension
         SHARE_BN: True
       SOFTMAX:
         LABEL_SMOOTHING: 0.1
-        OUTPUT_DIM: 76_775 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.
+        OUTPUT_DIM: 80_017 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.
     LOSS_INDUCTIVE:
       RELEASE_GENRES: # must be key like in Discogs dataset
         LOSS_NAME: SOFTMAX
