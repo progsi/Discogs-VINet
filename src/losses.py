@@ -11,6 +11,7 @@ CENTER_LOSS = 'center'
 SOFTMAX_LOSS = 'softmax'
 PROTOTYPICAL_LOSS = 'prototypical'
 FOCAL_LOSS = 'focal'
+MULTILABEL = 'multilabel'
 
 def init_single_loss(loss_name: str, loss_params: dict) -> Type[nn.Module]:
     """Initialize a single loss function.
@@ -35,6 +36,8 @@ def init_single_loss(loss_name: str, loss_params: dict) -> Type[nn.Module]:
         return nn.CrossEntropyLoss(label_smoothing=loss_params['LABEL_SMOOTHING'])
     elif loss_name == PROTOTYPICAL_LOSS.upper():
         return PrototypicalLoss(n_support=loss_params['N_SUPPORT'])
+    elif loss_name == MULTILABEL.upper():
+        return nn.BCEWithLogitsLoss()
 
 def init_loss(loss_config: dict, loss_config_inductive: dict) -> Type[nn.Module]:
     """Initialize a loss function, either single loss or weihted Multiloss.

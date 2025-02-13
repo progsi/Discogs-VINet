@@ -1,10 +1,11 @@
 import json
 import pathlib
-from typing import Tuple, List, Dict
+from typing import Tuple, List, Dict, Union
 import random
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 
 from .dataset import BaseDataset
 
@@ -253,12 +254,12 @@ class RichTrainDataset(TrainDataset):
         feature, label = super().__getitem__(index)
         
         labels = {}
-        labels["cls"] = label
+        labels["cls"] = torch.tensor(label)
         
         if self.genre_label_strategy:
-            labels[self.GENRES_KEY] = self.get_cls_id(version, self.GENRES_KEY, self.genre_label_strategy)
+            labels[self.GENRES_KEY] = self.get_cls_ids(version, self.GENRES_KEY, self.genre_label_strategy)
         if self.style_label_strategy:
-            labels[self.STYLES_KEY] = self.get_cls_id(version, self.STYLES_KEY, self.style_label_strategy)
+            labels[self.STYLES_KEY] = self.get_cls_ids(version, self.STYLES_KEY, self.style_label_strategy)
         if self.country_label_strategy:
             labels[self.COUNTRY_KEY] = self.cls_to_ids[self.COUNTRY_KEY][version[self.COUNTRY_KEY]]
         if self.year_label_strategy:
@@ -287,18 +288,36 @@ class RichTrainDataset(TrainDataset):
                 cls_id += 1
         return values
     
-    def get_cls_id(self, version: Dict[str, any], key: str, strategy: str) -> int:
+    def get_cls_ids(self, version: Dict[str, any], key: str, strategy: str) -> torch.Tensor:
+        """Gets label id(s) for a given key and strategy. 
+        If strategy is "multilabel" or "smooth", tensor is multi-hot encoded.  
+        Args:
+            version (Dict[str, any]): version dict
+            key (str): key to inductive label
+            strategy (str): strategy to get label
+        Raises:
+            ValueError: unknown strategy
+        Returns:
+            torch.Tensor: label id(s)
+        """
         items = version[key]
         if strategy == "random":
             item = random.choice(items)
+            return torch.tensor(self.cls_to_ids[key][item])
         elif strategy == "first":
-            item = items[0]
+            item = torch.tensor(items[0])
+            return self.cls_to_ids[key][item]
         elif strategy == "multilabel" or strategy == "smooth":
-            raise NotImplementedError(f"Strategy {strategy} not implemented.")
+            # Multi-label encoding
+            items = torch.tensor([self.cls_to_ids[key][item] for item in items])
+            n = len(self.cls_to_ids[key])
+            ids = torch.sum(F.one_hot(items, n), axis=0).float()
+            # Smoothing
+            if strategy == "smooth":
+                ids = ids / ids.sum(dim=1, keepdim=True)
+            return ids
         else:
             raise ValueError(f"Unknown strategy: {strategy}")
-        return self.cls_to_ids[key][item]
-    
     
     @staticmethod
     def collate_fn(items) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -326,6 +345,7 @@ class RichTrainDataset(TrainDataset):
         
         features = torch.stack(padded_features)
         keys = items[0][1].keys()
-        labels = {k: torch.tensor([item[1][k] for item in items]) for k in keys}
+        
+        labels = {k: torch.stack([item[1][k] for item in items]) for k in keys}
 
         return features, labels

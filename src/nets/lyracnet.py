@@ -70,7 +70,7 @@ class LyraCNet(nn.Module):
                  loss_config: Dict[str,Union[int,str]] = None,
                  dropout: float = 0.0, 
                  dense_dropout: float = 0.0,
-                loss_config_inductive: Dict[str,Union[int,str]] = None,
+                 loss_config_inductive: Dict[str,Union[int,str]] = None,
                  ):
         super(LyraCNet, self).__init__()
         
