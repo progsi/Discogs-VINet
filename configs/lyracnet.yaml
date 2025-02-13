@@ -17,11 +17,11 @@ TRAIN:
     FEATURES_DIR: /data/audio/cqt/
     TRAIN_CLIQUES: /data/discogs/Discogs-VI-YT-20240701-light.json.train
     VALIDATION_CLIQUES: /data/discogs/Discogs-VI-YT-20240701-light.json.val
-    M_PER_CLASS: 6 # Number of versions per clique during a training iteration.
+    M_PER_CLASS: 4 # Number of versions per clique during a training iteration.
     SCALE: null # ['normalize', 'upscale']
     MAX_LENGTH: 8000 # Number of frames to consider as context, before downsampling.
     MIN_LENGTH: 4000
-    BATCH_SIZE: 384 # Number of versions in batch.
+    BATCH_SIZE: 216 # Number of versions in batch.
     EPOCHS: 200 # Number of epochs to train.
     AUGMENTATION:
       F: 27
@@ -32,7 +32,7 @@ TRAIN:
     LOSS:
       PROTOTYPICAL:
         WEIGHT: 1.0
-        N_SUPPORT: 3
+        N_SUPPORT: 2
       TRIPLET:
         WEIGHT: 1 # Weight of the loss.
         MARGIN: 0.2 # Triplet loss margin
