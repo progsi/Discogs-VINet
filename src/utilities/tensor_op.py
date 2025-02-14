@@ -162,8 +162,7 @@ def pairwise_dot_product(
 
 
 def create_class_matrix(
-    labels: torch.Tensor, zero_diagonal: bool = False, memory_efficient: bool = False
-) -> torch.Tensor:
+    labels: torch.Tensor, zero_diagonal: bool = False) -> torch.Tensor:
     """Takes a 1D tensor of integer class labels and creates a binary metrix where each row
     indicates if the columns are from the same clique. It is important to use double
     precision to avoid numerical errors. Believe me.
@@ -189,17 +188,19 @@ def create_class_matrix(
 
     assert labels.dim() == 1, "Labels must be a 1D tensor"
 
-    if memory_efficient:
-        class_matrix = torch.zeros(len(labels), len(labels), dtype=torch.int32)
-        for i, label in enumerate(labels):
-            class_matrix[i] = labels == label
-    else:
-        class_matrix = (
-            pairwise_distance_matrix(
-                labels.unsqueeze(1).double(), squared=True, precision="low"
-            )
-            < 0.5
-        ).int()
+    class_matrix = (labels.unsqueeze(0) == labels.unsqueeze(1)).to(torch.int)
+    # TODO: needs further testing
+    # if memory_efficient:
+    #     class_matrix = torch.zeros(len(labels), len(labels), dtype=torch.int32)
+    #     for i, label in enumerate(labels):
+    #         class_matrix[i] = labels == label
+    # else:
+    #     class_matrix = (
+    #         pairwise_distance_matrix(
+    #             labels.unsqueeze(1).double(), squared=True, precision="low"
+    #         )
+    #         < 0.5
+    #     ).int()
 
     if zero_diagonal:
         class_matrix.fill_diagonal_(0)

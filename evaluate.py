@@ -63,6 +63,7 @@ def evaluate(
     # Preallocate tensors to avoid https://github.com/pytorch/pytorch/issues/13246
     embeddings = torch.zeros((N, embed_dim), dtype=torch.float32, device=device)
     labels = torch.zeros(N, dtype=torch.int32, device=device)
+    genres = torch.zeros(N, dtype=torch.int32, device=device)
 
     print("Extracting embeddings...")
     for idx, (feature, label) in enumerate(loader):
@@ -72,7 +73,9 @@ def evaluate(
             embedding, _ = model(feature)
             
         embeddings[idx : idx + 1] = embedding
-        labels[idx : idx + 1] = label.to(device)
+        labels[idx : idx + 1] = label["cls"].to(device)
+        genres[idx : idx + 1] = label["genres"].to(device)
+        
         if (idx + 1) % (len(loader) // 10) == 0 or idx == len(loader) - 1:
             print(f"[{(idx+1):>{len(str(len(loader)))}}/{len(loader)}]")
     print(f"Extraction time: {format_time(time.monotonic() - t0)}")
@@ -100,6 +103,7 @@ def evaluate(
         noise_works=noise_works,
         chunk_size=chunk_size,
         device=device,
+        genres=genres
     )
     print(f"Calculation time: {format_time(time.monotonic() - t0)}")
 
@@ -163,6 +167,11 @@ if __name__ == "__main__":
         help="Number of workers to use in the DataLoader.",
     )
     parser.add_argument(
+        "--cross-genre",
+        action="store_true",
+        help="""Flag to enable cross-genre evaluation.""",
+    )
+    parser.add_argument(
         "--no-gpu",
         action="store_true",
         help="""Flag to disable the GPU. If not provided, 
@@ -193,15 +202,15 @@ if __name__ == "__main__":
         args.test_cliques,
         args.features_dir,
         mean_downsample_factor=config["MODEL"]["DOWNSAMPLE_FACTOR"],
-    )
+        cross_genre=args.cross_genre,)
+    
     eval_loader = DataLoader(
-        eval_dataset,
-        batch_size=1,
-        shuffle=False,
-        drop_last=False,
-        num_workers=args.num_workers,
-    )
-
+            eval_dataset,
+            batch_size=1,
+            shuffle=False,
+            drop_last=False,
+            num_workers=args.num_workers,)
+    
     if args.no_gpu:
         device = torch.device("cpu")
     else:

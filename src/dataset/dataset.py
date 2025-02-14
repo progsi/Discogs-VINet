@@ -7,6 +7,11 @@ from torch.utils.data import Dataset
 
 from .dataset_utils import mean_downsample_cqt, normalize_cqt, upscale_cqt_values
 
+GENRES_KEY = "release_genres"
+STYLES_KEY = "release_styles"
+COUNTRY_KEY = "country"
+YEAR_KEY = "released"  
+
 class BaseDataset(Dataset):
     """BaseDataset with elementary functions.
     """

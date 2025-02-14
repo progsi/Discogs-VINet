@@ -30,11 +30,12 @@ def count_model_parameters(model, verbose: bool = True) -> Tuple[int, int]:
     return grad_params, non_grad_params
 
     
-def build_model_with_loss(config: dict, device: str) -> Tuple[torch.nn.Module, torch.nn.Module]:
+def build_model(config: dict, device: str, mode: str) -> Tuple[torch.nn.Module, torch.nn.Module]:
     """builds model and loss.
     Args:
         config (dict): config with parameters
         device (str): device, eg. cuda, cpu
+        mode (str): train or infer
     Raises:
         ValueError: 
     Returns:
@@ -44,13 +45,15 @@ def build_model_with_loss(config: dict, device: str) -> Tuple[torch.nn.Module, t
     loss_config = config["TRAIN"]["LOSS"]
     loss_config_inductive = config["TRAIN"].get("LOSS_INDUCTIVE")
     
-    inductive_heads = {k: v["OUTPUT_DIM"] for (k,v) in loss_config_inductive.items()} if loss_config_inductive else None
-    loss_func = init_loss(loss_config, loss_config_inductive)
+    if mode == "train":
+        loss_func = init_loss(loss_config, loss_config_inductive)
     
-    if config["MODEL"]["ARCHITECTURE"].upper() != "LYRACNET":
-        assert not (
-            (isinstance(loss_func, WeightedMultiloss) or isinstance(loss_func, WeightedMultilossInductive))and 
-            config["MODEL"]["NECK"] != "bnneck"), "WeightedMultiloss only works with BNNeck"
+        if config["MODEL"]["ARCHITECTURE"].upper() != "LYRACNET":
+            assert not (
+                (isinstance(loss_func, WeightedMultiloss) or isinstance(loss_func, WeightedMultilossInductive))and 
+                config["MODEL"]["NECK"] != "bnneck"), "WeightedMultiloss only works with BNNeck"
+    else:
+        loss_func = None
         
     if config["MODEL"]["ARCHITECTURE"].upper() == "CQTNET":
         model = CQTNet(
@@ -146,7 +149,7 @@ def load_model(config: dict, device: str, mode="train"):
 
     assert mode in ["train", "infer"], "Mode must be either 'train' or 'infer'"
     
-    model, loss_func = build_model_with_loss(config, device)
+    model, loss_func = build_model(config, device, mode)
 
     if mode == "train":
 

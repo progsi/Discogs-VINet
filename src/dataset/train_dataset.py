@@ -1,18 +1,13 @@
 import json
 import pathlib
-from typing import Tuple, List, Dict, Union
+from typing import Tuple, Dict
 import random
 
 import numpy as np
 import torch
 import torch.nn.functional as F
 
-from .dataset import BaseDataset
-
-GENRES_KEY = "release_genres"
-STYLES_KEY = "release_styles"
-COUNTRY_KEY = "country"
-YEAR_KEY = "released"  
+from .dataset import BaseDataset, GENRES_KEY, STYLES_KEY, COUNTRY_KEY, YEAR_KEY
 
 class TrainDataset(BaseDataset):
     """Training dataset.

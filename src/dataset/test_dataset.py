@@ -1,14 +1,12 @@
-from typing import Union, Tuple
+from typing import Union, Tuple, List
 
 import json
 import pathlib
 
-import numpy as np
-
 import torch
+import torch.nn.functional as F
 
-from .dataset import BaseDataset
-from .dataset_utils import mean_downsample_cqt, normalize_cqt, upscale_cqt_values
+from .dataset import BaseDataset, GENRES_KEY
 
 
 class TestDataset(BaseDataset):
@@ -28,6 +26,7 @@ class TestDataset(BaseDataset):
         cqt_bins: int = 84,
         scale: str = "norm",
         min_length: int = None,
+        cross_genre: bool = False
     ) -> None:
         """Initializes the dataset
 
@@ -44,6 +43,8 @@ class TestDataset(BaseDataset):
         scale : str
             "normalize": scale the features to [0,1]
             "upscale": upscale the features (eg. used by CoverHunter)
+        cross_genre: bool: 
+            Whether to do cross-genre evaluation or not. Default is False.
         """
 
         assert cqt_bins > 0, f"Expected cqt_bins > 0, got {cqt_bins}"
@@ -57,7 +58,8 @@ class TestDataset(BaseDataset):
         self.scale = scale
         self.cqt_bins = cqt_bins
         self.min_length = min_length
-
+        self.cross_genre = cross_genre
+        
         # Load the cliques
         print(f"Loading cliques from {cliques_json_path}")
         with open(cliques_json_path) as f:
@@ -103,14 +105,29 @@ class TestDataset(BaseDataset):
 
         # Create a list of all versions together with their clique ID
         self.items = []
+        self.metadata = []
+        # for cross-genre
+        self.genre_to_idx = {} 
+        cur_idx = 0
+        
         if not self.datacos:
             for clique_id, versions in self.cliques.items():
-                for i in range(len(versions)):
+                for i, version in enumerate(versions):
                     self.items.append((clique_id, i))
+                    self.metadata.append(version)
+                    # for cross-genre
+                    for genre in version[GENRES_KEY]:
+                        if genre not in self.genre_to_idx:
+                            self.genre_to_idx[genre] = cur_idx
+                            cur_idx += 1
         else:
             for clique_id, versions in self.cliques.items():
                 for version_id in versions.keys():
                     self.items.append((clique_id, version_id))
+                    
+        self.ngenres = len(self.genre_to_idx)
+            
+                    
 
     def __getitem__(
         self, idx, encode_version=False
@@ -132,16 +149,30 @@ class TestDataset(BaseDataset):
         feature: torch.Tensor
             The CQT feature of the version shape=(F,T), dtype=float32
 
-        label: Union[str, int]
+        label: Union[str, int, dict]
             Label for the feature 'clique_id|version_id'. Depends on the value of encode_version.
             NOTE: Our labels are not consecutive integers. They are the clique_id.
         """
         clique_id, label, feature_id, feature_dir = self.get_feature_info(idx, encode_version)
         feature = self.load_cqt(feature_dir, feature_id, self.min_length)
+        
+        labels = {
+            "cls": label,
+        }
+        if self.cross_genre:
+            labels["genres"] = self.get_genre_multihot(self.metadata[idx][GENRES_KEY])
 
-        return feature, label
+        return feature, labels
 
     def __len__(self) -> int:
         """Returns the number of versions in the dataset."""
 
         return len(self.items)
+
+    def get_genre_multihot(self, genres: List[str]) -> str:
+        """Gets a genre labels based on genre list as multi-hot encoded.
+        Returns:
+            List[int]: multi-hot encoded genre labels
+        """
+        genre_ids = [self.genre_to_idx[genre] for genre in genres]
+        return F.one_hot(torch.tensor(genre_ids), num_classes=self.ngenres).sum(dim=0)

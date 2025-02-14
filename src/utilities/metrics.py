@@ -15,6 +15,7 @@ def calculate_metrics(
     noise_works: bool = False,
     chunk_size: int = 256,
     device: str = "cpu",
+    genres: torch.Tensor = None,
 ) -> dict:
     """Perform similarity search for a set of embeddings and calculate the following
     metrics using the ground truth labels.
@@ -43,14 +44,13 @@ def calculate_metrics(
         The size of the chunks to use during the evaluation.
     device: str = "cpu"
         The device to use for the calculations.
-
     Returns:
     --------
     metrics: dict
         Dictionary containing the performance metrics.
 
     """
-
+    # TODO: implement cross-genre eval.
     assert labels.dim() == 1, "Labels must be a 1D tensor"
     assert (
         embeddings.dim() == 2
@@ -82,9 +82,7 @@ def calculate_metrics(
 
     # Each row indicates if the columns are from the same clique,
     # diagonal is set to 0
-    class_matrix = create_class_matrix(
-        labels, zero_diagonal=True, memory_efficient=True
-    ).float()
+    class_matrix = create_class_matrix(labels, zero_diagonal=True).float()
 
     # Initialize the tensors for storing the evaluation metrics
     TOP1, TOP10 = torch.tensor([]), torch.tensor([])
