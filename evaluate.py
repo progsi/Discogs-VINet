@@ -4,6 +4,7 @@ import time
 import yaml
 import argparse
 from typing import Type
+from tqdm import tqdm
 
 import torch
 from torch.utils.data import DataLoader
@@ -23,6 +24,7 @@ def evaluate(
     noise_works: bool,
     amp: bool,
     device: torch.device,
+    genres: torch.Tensor = None,
 ) -> dict:
     """Evaluate the model by simulating the retrieval task. Compute the embeddings
     of all versions and calculate the pairwise distances. Calculate the mean average
@@ -46,6 +48,8 @@ def evaluate(
         Flag to indicate if Automatic Mixed Precision should be used.
     device : torch.device
         Device to use for inference and metric calculation.
+    genres : torch.Tensor
+        Tensor with multi-hot genres.
 
     Returns:
     --------
@@ -56,30 +60,26 @@ def evaluate(
     t0 = time.monotonic()
 
     model.eval()
-
-    N = len(loader)
-    embed_dim = model.embed_dim
     
     # Preallocate tensors to avoid https://github.com/pytorch/pytorch/issues/13246
-    embeddings = torch.zeros((N, embed_dim), dtype=torch.float32, device=device)
-    labels = torch.zeros(N, dtype=torch.int32, device=device)
-    genres = torch.zeros(N, dtype=torch.int32, device=device)
+    embeddings = []
+    labels = []
 
     print("Extracting embeddings...")
-    for idx, (feature, label) in enumerate(loader):
-        assert feature.shape[0] == 1, "Batch size must be 1 for inference."
+    for i, (feature, label) in tqdm(enumerate(loader)):
+
         feature = feature.unsqueeze(1).to(device)  # (1,F,T) -> (1,1,F,T)
         with torch.autocast(device_type=device.type, dtype=torch.float16, enabled=amp):
             embedding, _ = model(feature)
             
-        embeddings[idx : idx + 1] = embedding
-        labels[idx : idx + 1] = label["cls"].to(device)
-        genres[idx : idx + 1] = label["genres"].to(device)
+        embeddings.append(embedding)
+        labels.append(label)
         
-        if (idx + 1) % (len(loader) // 10) == 0 or idx == len(loader) - 1:
-            print(f"[{(idx+1):>{len(str(len(loader)))}}/{len(loader)}]")
     print(f"Extraction time: {format_time(time.monotonic() - t0)}")
 
+    embeddings = torch.cat(embeddings).to(device)
+    labels = torch.cat(labels).to(device)
+    
     # If there are no noise works, remove the cliques with single versions
     # this may happen due to the feature extraction process.
     if not noise_works:
@@ -154,6 +154,12 @@ if __name__ == "__main__":
         Optional, by default uses the path in the config file.""",
     )
     parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=128,
+        help="Test batch size.",
+    )
+    parser.add_argument(
         "--chunk-size",
         "-b",
         type=int,
@@ -202,14 +208,15 @@ if __name__ == "__main__":
         args.test_cliques,
         args.features_dir,
         mean_downsample_factor=config["MODEL"]["DOWNSAMPLE_FACTOR"],
-        cross_genre=args.cross_genre,)
+        cross_genre=args.cross_genre)
     
     eval_loader = DataLoader(
             eval_dataset,
-            batch_size=1,
+            batch_size=args.batch_size,
             shuffle=False,
             drop_last=False,
-            num_workers=args.num_workers,)
+            num_workers=args.num_workers,
+            collate_fn=eval_dataset.collate_fn,)
     
     if args.no_gpu:
         device = torch.device("cpu")
@@ -245,6 +252,11 @@ if __name__ == "__main__":
 
     if args.similarity_search is None:
         args.similarity_search = config["MODEL"]["SIMILARITY_SEARCH"]
+        
+    if args.cross_genre:
+        genres = eval_dataset.get_all_genres_multihot()
+    else:
+        genres = None
 
     print("Evaluating...")
     t0 = time.monotonic()
@@ -256,6 +268,7 @@ if __name__ == "__main__":
         noise_works=eval_dataset.datacos,
         amp=config["TRAIN"]["AUTOMATIC_MIXED_PRECISION"],
         device=device,
+        genres=genres,
     )
     print(f"Total time: {format_time(time.monotonic() - t0)}")
 

@@ -160,36 +160,7 @@ class TrainDataset(BaseDataset):
         """Each version appears once at each epoch."""
 
         return len(self.labels)
-
-    @staticmethod
-    def collate_fn(items) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Collate function for the dataset. 
-        Parameters:
-        -----------
-        items: list
-            List of tuples containing the features and labels of the versions
-
-        Returns:
-        --------
-        features: torch.Tensor
-            The CQT features of the anchors, shape=(B, F, T), dtype=float32
-            F is the number of CQT bins.
-            T is the downsampled max_length,
-        labels: torch.Tensor
-            1D tensor of the clique labels, shape=(B,)
-        """
-        
-        # padding
-        max_length = max(item[0].shape[1] for item in items)
-        padded_features = [
-            torch.nn.functional.pad(item[0], (0, max_length - item[0].shape[1])) for item in items
-        ]
-        
-        features = torch.stack(padded_features)
-        labels = torch.tensor([item[1] for item in items])
-
-        return features, labels
-
+    
 
 class RichTrainDataset(TrainDataset):
     """Class for the rich training dataset for inductive transfer learning.

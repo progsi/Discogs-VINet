@@ -123,15 +123,12 @@ class TestDataset(BaseDataset):
         else:
             for clique_id, versions in self.cliques.items():
                 for version_id in versions.keys():
-                    self.items.append((clique_id, version_id))
-                    
-        self.ngenres = len(self.genre_to_idx)
-            
+                    self.items.append((clique_id, version_id))            
                     
 
     def __getitem__(
         self, idx, encode_version=False
-    ) -> Tuple[torch.Tensor, Union[str, int]]:
+    ) -> Tuple[torch.Tensor, int]:
         """For a given index, returns the feature and label for the corresponding version.
         Features are loaded as full duration first and then downsampled but chunk sampling is
         not applied, i.e. a feature is returned in full duration.
@@ -144,35 +141,47 @@ class TestDataset(BaseDataset):
             If True, the label is a string in the format 'clique_id|version_id'.
             If False, the label is an integer obtained from the clique_id. Default is False.
 
-        Returns:
+        Returns: Tuple[torch.Tensor, int]
         --------
         feature: torch.Tensor
             The CQT feature of the version shape=(F,T), dtype=float32
 
-        label: Union[str, int, dict]
+        label: int or str
             Label for the feature 'clique_id|version_id'. Depends on the value of encode_version.
             NOTE: Our labels are not consecutive integers. They are the clique_id.
         """
         clique_id, label, feature_id, feature_dir = self.get_feature_info(idx, encode_version)
         feature = self.load_cqt(feature_dir, feature_id, self.min_length)
-        
-        labels = {
-            "cls": label,
-        }
-        if self.cross_genre:
-            labels["genres"] = self.get_genre_multihot(self.metadata[idx][GENRES_KEY])
 
-        return feature, labels
+        return feature, label
 
     def __len__(self) -> int:
         """Returns the number of versions in the dataset."""
 
         return len(self.items)
 
-    def get_genre_multihot(self, genres: List[str]) -> str:
+    def genre_to_multihot(self, genres: List[str]) -> str:
         """Gets a genre labels based on genre list as multi-hot encoded.
         Returns:
             List[int]: multi-hot encoded genre labels
         """
         genre_ids = [self.genre_to_idx[genre] for genre in genres]
-        return F.one_hot(torch.tensor(genre_ids), num_classes=self.ngenres).sum(dim=0)
+        return F.one_hot(torch.tensor(genre_ids), num_classes=len(self.genre_to_idx)).sum(dim=0)
+    
+    def get_labels(self):
+        return self.genre_to_idx
+    
+    def get_all_genres_multihot(self) -> torch.Tensor:
+        """Gets all genre labels based on genre mapping as multi-hot tensor.
+        Returns:
+            torch.Tensor: multi-hot encoded genre labelss
+        """
+        return torch.stack([self.genre_to_multihot(item["release_genres"]) for item in self.metadata])
+    
+    def get_all_int_labels(self) -> torch.Tensor:
+        """Gets all int labels.
+        Returns:
+            torch.Tensor: all int labels by clique
+        """
+        return torch.stack([self.get_int_label(item[0]) for item in self.items])
+    

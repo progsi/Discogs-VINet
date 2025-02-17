@@ -1,5 +1,6 @@
 from collections import defaultdict
 import random 
+from typing import Tuple
 
 import numpy as np
 import torch
@@ -43,6 +44,9 @@ class BaseDataset(Dataset):
             # Remove cliques without remaining values
             if not self.cliques[clique_id]:
                 del self.cliques[clique_id]
+                
+    def get_int_label(self, clique_id: str) -> int:
+        return int(clique_id.split("W_")[1])
     
     def get_feature_info(self, idx, encode_version=True):
         if self.datacos:
@@ -50,7 +54,7 @@ class BaseDataset(Dataset):
             if encode_version:
                 label = f"{clique_id}|{version_id}"
             else:
-                label = int(clique_id.split("W_")[1])
+                label = self.get_int_label(idx)
             feature_id = version_id
             feature_dir = self.features_dir
         else:
@@ -160,3 +164,31 @@ class BaseDataset(Dataset):
 
         return feature
 
+    @staticmethod
+    def collate_fn(items) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Collate function for the dataset. 
+        Parameters:
+        -----------
+        items: list
+            List of tuples containing the features and labels of the versions
+
+        Returns:
+        --------
+        features: torch.Tensor
+            The CQT features of the anchors, shape=(B, F, T), dtype=float32
+            F is the number of CQT bins.
+            T is the downsampled max_length,
+        labels: torch.Tensor
+            1D tensor of the clique labels, shape=(B,)
+        """
+        
+        # padding
+        max_length = max(item[0].shape[1] for item in items)
+        padded_features = [
+            torch.nn.functional.pad(item[0], (0, max_length - item[0].shape[1])) for item in items
+        ]
+        
+        features = torch.stack(padded_features)
+        labels = torch.tensor([item[1] for item in items])
+
+        return features, labels
