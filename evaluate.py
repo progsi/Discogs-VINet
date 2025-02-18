@@ -66,7 +66,7 @@ def evaluate(
     labels = []
 
     print("Extracting embeddings...")
-    for i, (feature, label) in tqdm(enumerate(loader)):
+    for i, (feature, label) in tqdm(enumerate(loader), total=len(loader)):
 
         feature = feature.unsqueeze(1).to(device)  # (1,F,T) -> (1,1,F,T)
         with torch.autocast(device_type=device.type, dtype=torch.float16, enabled=amp):
@@ -156,14 +156,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--batch-size",
         type=int,
-        default=128,
+        default=216,
         help="Test batch size.",
     )
     parser.add_argument(
         "--chunk-size",
         "-b",
         type=int,
-        default=1024,
+        default=None,
         help="Chunk size to use during metrics calculation.",
     )
     parser.add_argument(
@@ -282,3 +282,7 @@ if __name__ == "__main__":
 
     #############
     print("Done!")
+
+# TODO: Test regaring Padding: Batch Size 1 vs. Batch Size 216
+# TODO: Test regarding GPU Usage: 
+#       - chunk_size=None vs. chunk_size=1_024 vs. chunk_size=10_240

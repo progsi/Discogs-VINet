@@ -1,4 +1,4 @@
-from typing import Union, Tuple, List
+from typing import Tuple, List
 
 import json
 import pathlib
@@ -124,7 +124,7 @@ class TestDataset(BaseDataset):
             for clique_id, versions in self.cliques.items():
                 for version_id in versions.keys():
                     self.items.append((clique_id, version_id))            
-                    
+        print(1)                    
 
     def __getitem__(
         self, idx, encode_version=False
@@ -152,14 +152,12 @@ class TestDataset(BaseDataset):
         """
         clique_id, label, feature_id, feature_dir = self.get_feature_info(idx, encode_version)
         feature = self.load_cqt(feature_dir, feature_id, self.min_length)
-
         return feature, label
 
     def __len__(self) -> int:
         """Returns the number of versions in the dataset."""
-
         return len(self.items)
-
+        
     def genre_to_multihot(self, genres: List[str]) -> str:
         """Gets a genre labels based on genre list as multi-hot encoded.
         Returns:

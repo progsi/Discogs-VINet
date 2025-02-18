@@ -10,6 +10,9 @@ from src.utilities.tensor_op import (
     create_class_matrix,
 )
 
+MAP = RetrievalMAP(empty_target_action="skip", top_k=None)
+MRR = RetrievalMRR(empty_target_action="skip", top_k=None)
+HR10 = RetrievalHitRate(empty_target_action="skip", top_k=10)
 
 def compute_chunkwise(S: torch.Tensor, 
                       C: torch.Tensor, 
@@ -31,7 +34,6 @@ def compute_chunkwise(S: torch.Tensor,
     )  # (1, N-1)
     
     # Initialize the tensors for storing the evaluation metrics
-    TOP1, TOP10 = torch.tensor([]), torch.tensor([])
     TR, MAP = torch.tensor([]), torch.tensor([])
 
     # Iterate over the chunks
@@ -56,10 +58,6 @@ def compute_chunkwise(S: torch.Tensor,
         # Get the relevance values of the k most similar embeddings
         relevance = torch.gather(c, 1, spred)  # (B', N-1)
 
-        # Number of relevant items in the top 1 and 10
-        top1 = relevance[:, 0].int().cpu()
-        top10 = relevance[:, :10].int().sum(1).cpu()
-
         # Get the rank of the first correct prediction by tie breaking
         temp = (
             torch.arange(k, dtype=torch.float32, device=device).unsqueeze(0) * 1e-6
@@ -82,37 +80,61 @@ def compute_chunkwise(S: torch.Tensor,
         # Concatenate the results from all chunks
         TR = torch.cat((TR, top_rank))
         MAP = torch.cat((MAP, ap))
-        TOP1 = torch.cat((TOP1, top1))
-        TOP10 = torch.cat((TOP10, top10))
 
     # computing the final evaluation metrics
-    TOP1 = TOP1.int().sum().item()
-    TOP10 = TOP10.int().sum().item()
-    MR1 = torch.nanmean((sel+1).float()).item() # before: TR.mean().item()
+    MR1 = torch.nanmean(TR).float().item() # before: TR.mean().item()
     MRR = torch.nanmean((1/TR).float()).item() # before: (1 / TR).mean().item()
     MAP = MAP.mean().item()
     return {
         "MAP": round(MAP, 3),
         "MRR": round(MRR, 3),
         "MR1": round(MR1, 2),
-        "Top1": TOP1,
-        "Top10": TOP10 if k > 10 else None,
+        "nQueries": S.shape[1],
+        "nCandidates": S.shape[0],
     }
+    
+    
+def MR1(preds: torch.Tensor, target: torch.Tensor, device: str) -> torch.Tensor:
+    """
+    Compute the mean rank for relevant items in the predictions.
+    Args:
+        preds (torch.Tensor): A tensor of predicted scores (higher scores indicate more relevant items).
+        target (torch.Tensor): A tensor of true relationships (0 for irrelevant, 1 for relevant).
+    Returns:
+        torch.Tensor: The mean rank of relevant items for each query.
+    """
+    has_positives = torch.sum(target, 1) > 0
+    
+    _, spred = torch.topk(preds, preds.size(1), dim=1)
+    found = torch.gather(target, 1, spred)
+    temp = torch.arange(preds.size(1)).to(device).float() * 1e-6
+    _, sel = torch.topk(found - temp, 1, dim=1)
+    
+    sel = sel.float()
+    sel[~has_positives] = torch.nan
+    
+    return torch.nanmean((sel+1).float())
 
 def compute_all(S: torch.Tensor, 
                 C: torch.Tensor, 
                 device: str = "cpu") -> Dict[str, float]:
-    S, C = S.to(device), C.to(device)
-    mAP = RetrievalMAP(empty_target_action="skip").compute(S, C)
-    mRR = RetrievalMRR(empty_target_action="skip").compute(S, C)
-    top1 = RetrievalHitRate(k=10, empty_target_action="skip").compute(S, C)
-    return {
-        "MAP": mAP.item(),
-        "MRR": mRR.item(),
-        "HR@10": top1.item(),
-    }
     
-        
+    S, C = S.to(device), C.to(device)
+    indexes = torch.arange(S.size(0), device=device).unsqueeze(1).expand_as(S)
+
+    mAP = MAP(S, C, indexes)
+    mRR = MRR(S, C, indexes)
+    hr10 = HR10(S, C, indexes)
+    mr1 = MR1(S, C, device)
+    return {
+        "MAP": round(mAP.item(), 3),
+        "MRR": round(mRR.item(), 3),
+        "MR1": round(mr1.item(), 3),
+        "HR@10": round(hr10.item(), 3),
+        "nQueries": S.shape[1],
+        "nCandidates": S.shape[0],
+    }
+          
 def calculate_metrics(
     embeddings: torch.Tensor,
     labels: torch.Tensor,
@@ -211,10 +233,12 @@ def calculate_metrics(
     # storing the evaluation metrics
     if chunk_size:
         metrics = compute_chunkwise(S, C, k, chunk_size, device) 
-    
+    else:
+        metrics = compute_all(S, C, device)
+        
     # printing the evaluation metrics
     for k, v in metrics.items():
-        if k in ["Top1", "Top10"]:
+        if k in ["nQueries", "nCandidates"]:
             print(f"{k:>5}: {v}")
         else:
             print(f"{k:>5}: {v:.3f}")
