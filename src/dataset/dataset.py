@@ -116,6 +116,7 @@ class BaseDataset(Dataset):
                 shape=(length, feature_shape[1]),
                 offset=start * feature_shape[1] * 2,  # 2 bytes per float16
             )
+            
         else:
             # Load the whole feature
             fp = np.memmap(

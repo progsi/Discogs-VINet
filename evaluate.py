@@ -62,23 +62,26 @@ def evaluate(
     model.eval()
     
     # Preallocate tensors to avoid https://github.com/pytorch/pytorch/issues/13246
-    embeddings = []
-    labels = []
-
+    N = len(loader)
+    d = model.embed_dim
+    
+    embeddings = torch.zeros((N, d))
+    labels = torch.zeros(N)
+    
     print("Extracting embeddings...")
-    for i, (feature, label) in tqdm(enumerate(loader), total=len(loader)):
+    for i, (feature, label) in tqdm(enumerate(loader), total=N):
 
         feature = feature.unsqueeze(1).to(device)  # (1,F,T) -> (1,1,F,T)
         with torch.autocast(device_type=device.type, dtype=torch.float16, enabled=amp):
             embedding, _ = model(feature)
             
-        embeddings.append(embedding)
-        labels.append(label)
+        embeddings[i] = embedding
+        labels[i] = label
         
     print(f"Extraction time: {format_time(time.monotonic() - t0)}")
 
-    embeddings = torch.cat(embeddings).to(device)
-    labels = torch.cat(labels).to(device)
+    embeddings = embeddings.to(device)
+    labels = labels.to(device)
     
     # If there are no noise works, remove the cliques with single versions
     # this may happen due to the feature extraction process.
@@ -156,7 +159,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--batch-size",
         type=int,
-        default=216,
+        default=1,
         help="Test batch size.",
     )
     parser.add_argument(
@@ -216,7 +219,7 @@ if __name__ == "__main__":
             shuffle=False,
             drop_last=False,
             num_workers=args.num_workers,
-            collate_fn=eval_dataset.collate_fn,)
+            collate_fn=eval_dataset.collate_fn if args.batch_size > 1 else None)
     
     if args.no_gpu:
         device = torch.device("cpu")

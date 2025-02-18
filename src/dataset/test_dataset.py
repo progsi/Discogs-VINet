@@ -8,7 +8,6 @@ import torch.nn.functional as F
 
 from .dataset import BaseDataset, GENRES_KEY
 
-
 class TestDataset(BaseDataset):
     """Test dataset.
 
@@ -124,7 +123,6 @@ class TestDataset(BaseDataset):
             for clique_id, versions in self.cliques.items():
                 for version_id in versions.keys():
                     self.items.append((clique_id, version_id))            
-        print(1)                    
 
     def __getitem__(
         self, idx, encode_version=False
