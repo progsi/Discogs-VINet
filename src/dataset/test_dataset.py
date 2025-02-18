@@ -115,10 +115,11 @@ class TestDataset(BaseDataset):
                     self.items.append((clique_id, i))
                     self.metadata.append(version)
                     # for cross-genre
-                    for genre in version[GENRES_KEY]:
-                        if genre not in self.genre_to_idx:
-                            self.genre_to_idx[genre] = cur_idx
-                            cur_idx += 1
+                    if self.cross_genre:
+                        for genre in version[GENRES_KEY]:
+                            if genre not in self.genre_to_idx:
+                                self.genre_to_idx[genre] = cur_idx
+                                cur_idx += 1
         else:
             for clique_id, versions in self.cliques.items():
                 for version_id in versions.keys():
