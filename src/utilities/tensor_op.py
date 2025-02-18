@@ -189,18 +189,6 @@ def create_class_matrix(
     assert labels.dim() == 1, "Labels must be a 1D tensor"
 
     class_matrix = (labels.unsqueeze(0) == labels.unsqueeze(1)).to(torch.int)
-    # TODO: needs further testing
-    # if memory_efficient:
-    #     class_matrix = torch.zeros(len(labels), len(labels), dtype=torch.int32)
-    #     for i, label in enumerate(labels):
-    #         class_matrix[i] = labels == label
-    # else:
-    #     class_matrix = (
-    #         pairwise_distance_matrix(
-    #             labels.unsqueeze(1).double(), squared=True, precision="low"
-    #         )
-    #         < 0.5
-    #     ).int()
 
     if zero_diagonal:
         class_matrix.fill_diagonal_(0)
