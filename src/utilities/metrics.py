@@ -256,17 +256,17 @@ def calculate_metrics(
 
     # Each row indicates if the columns are from the same clique,
     # diagonal is set to 0
-    C = create_class_matrix(labels, zero_diagonal=True).float()
+    C = create_class_matrix(labels.to("cpu"), zero_diagonal=True).float()
 
     # Compute the pairwise similarity matrix
     # NOTE: changed the device for product calc to cpu to save GPU memory
     if similarity_search == "MIPS":
-        S = pairwise_dot_product(embeddings.to("cpu")).to(device)  # (B, N) 
+        S = pairwise_dot_product(embeddings.to("cpu"))  # (B, N) 
     elif similarity_search == "MCSS":
-        S = pairwise_cosine_similarity(embeddings.to("cpu")).to(device)  # (B, N)
+        S = pairwise_cosine_similarity(embeddings.to("cpu"))  # (B, N)
     else:
         # Use low precision for faster calculations
-        S = -1 * pairwise_distance_matrix(embeddings, precision="low".to("cpu")).to(device)  # (B, N)
+        S = -1 * pairwise_distance_matrix(embeddings, precision="low".to("cpu"))  # (B, N)
 
     # Set the similarity of each query with itself to -inf
     S = S.fill_diagonal_(float("-inf"))
