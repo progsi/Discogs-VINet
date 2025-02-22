@@ -162,14 +162,16 @@ def cross_genre_metrics(S: torch.Tensor,
     """
     # Versions with the exact same genre(s)
     mask_same = torch.eq(genres.unsqueeze(1), genres.unsqueeze(0)).all(dim=-1)
+    mask_same = mask_same | ~C
     S_same , C_same = mask_tensors(S, C, mask_same)
     
     # Versions with at least one genre in common
     mask_similar =  torch.matmul(genres.float(), genres.t().float()) > 0
+    mask_similar = mask_similar | ~C
     S_similar , C_similar = mask_tensors(S, C, mask_similar)
     
     # Versions with no genre in common
-    mask_cross = ~mask_same & ~mask_similar
+    mask_cross = (~mask_same & ~mask_similar) | ~C
     S_cross , C_cross = mask_tensors(S, C, mask_cross)
     
     if chunk_size:
