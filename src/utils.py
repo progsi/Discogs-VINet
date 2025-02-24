@@ -45,6 +45,9 @@ def build_model(config: dict, device: str, mode: str) -> Tuple[torch.nn.Module, 
     loss_config = config["TRAIN"]["LOSS"]
     loss_config_inductive = config["TRAIN"].get("LOSS_INDUCTIVE")
     
+    if loss_config_inductive:
+        raise NotImplementedError("Inductive loss not implemented yet.")
+    
     if mode == "train":
         loss_func = init_loss(loss_config, loss_config_inductive)
     
@@ -82,8 +85,7 @@ def build_model(config: dict, device: str, mode: str) -> Tuple[torch.nn.Module, 
             num_blocks=config["MODEL"]["NUM_BLOCKS"],
             widen_factor=config["MODEL"]["WIDEN_FACTOR"],
             neck="bnneck",
-            loss_config=loss_config,
-            loss_config_inductive=loss_config_inductive
+            loss_config=loss_config
             ).to(device)
     elif config["MODEL"]["ARCHITECTURE"].upper() == "VERSEGNET":
         model = VerSegNet(
