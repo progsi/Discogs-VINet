@@ -166,7 +166,7 @@ if __name__ == "__main__":
         "--chunk-size",
         "-b",
         type=int,
-        default=None,
+        default=1024,
         help="Chunk size to use during metrics calculation.",
     )
     parser.add_argument(

@@ -69,15 +69,13 @@ class LyraCNet(nn.Module):
                  neck: str = "linear",
                  loss_config: Dict[str,Union[int,str]] = None,
                  dropout: float = 0.0, 
-                 dense_dropout: float = 0.0,
-                 loss_config_inductive: Dict[str,Union[int,str]] = None,
+                 dense_dropout: float = 0.0
                  ):
         super(LyraCNet, self).__init__()
         
         assert not (neck == "bnneck" and loss_config is None), "BNNeck requires loss_config!"
         self.num_blocks = num_blocks
         self.embed_dim = embed_dim
-        self.inductive = loss_config_inductive is not None
         
         nChannels = [16]
         for i in range(num_blocks):
@@ -103,11 +101,6 @@ class LyraCNet(nn.Module):
         self.relu = nn.LeakyReLU(negative_slope=0.1, inplace=True)
         self.drop = nn.Dropout(dense_dropout)        
         self.pooling = GeM() # flattening necessary?
-        
-        if self.inductive:
-            self.inductive_heads = nn.ModuleDict()
-            for label, config in loss_config_inductive.items():
-                self.inductive_heads[label] = nn.Linear(nChannels[-1], config["OUTPUT_DIM"])
         
         if neck != "bnneck":
             self.neck = SimpleNeck(self.embed_dim, embed_dim, neck)
@@ -140,10 +133,34 @@ class LyraCNet(nn.Module):
         
         out_tensor, out_dict = self.neck(x)
         
-        if self.inductive:
-            for label, head in self.inductive_heads.items():
-                out_dict[label] = head(x)
-        
         return out_tensor, out_dict
 
 
+class LyraCNetMTL(LyraCNet):
+        def __init__(self, 
+                 depth: int, 
+                 embed_dim: int, 
+                 num_blocks: int, 
+                 widen_factor: int, 
+                 neck: str = "linear",
+                 loss_config: Dict[str,Union[int,str]] = None,
+                 dropout: float = 0.0, 
+                 dense_dropout: float = 0.0,
+                 loss_config_inductive: Dict[str,Union[int,str]] = None,
+                 ):
+            super(LyraCNet, self).__init__(depth, embed_dim, num_blocks, 
+                                           widen_factor, neck, loss_config, 
+                                           dropout, dense_dropout, loss_config_inductive)
+            
+            self.inductive_heads = nn.ModuleDict()
+            for label, config in loss_config_inductive.items():
+                self.inductive_heads[label] = nn.Linear(self.nChannels[-1], config["OUTPUT_DIM"])
+            
+        def forward(self, x):
+            
+            out_tensor, out_dict = super().forward(x)
+            
+            for label, head in self.inductive_heads.items():
+                out_dict[label] = head(x)
+            
+            return out_tensor, out_dict
