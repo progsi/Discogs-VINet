@@ -13,9 +13,9 @@ class SimpleNeck(nn.Module):
             self.layer = Linear(input_dim, embed_dim)
         elif projection.lower() == "mlp":
             self.layer = nn.Sequential(
-                Linear(input_dim, embed_dim),
+                Linear(input_dim, 2 * input_dim),
                 nn.ReLU(inplace=True),
-                Linear(input_dim, embed_dim, bias=False),  # TODO bias=True?
+                Linear(2 * input_dim, embed_dim, bias=False),  # TODO bias=True?
             )
         elif projection.lower() == "none":
             self.layer = nn.Identity()

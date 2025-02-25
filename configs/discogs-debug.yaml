@@ -5,7 +5,7 @@ MODEL :
   EMBEDDING_SIZE: 512
   NORMALIZATION: bn # ['bn', 'in', 'ibn']
   POOLING: adaptive_max # ['adaptive_max', 'gem', 'softpool']
-  NECK: bnneck # ['none', 'linear', 'affine', 'mlp', 'bnneck']
+  NECK: linear # ['none', 'linear', 'affine', 'mlp', 'bnneck']
   L2_NORMALIZE: False # L2 normalize the embeddings.
   SIMILARITY_SEARCH: MIPS # ['MCSS', 'NNS', 'MIPS'] If L2_NORMALIZE is True, use 'MIPS' for faster search.
   DOWNSAMPLE_FACTOR: 20 # Downsampling factor.
@@ -18,13 +18,11 @@ TRAIN:
   VALIDATION_CLIQUES: /data/discogs/Discogs-VI-YT-20240701-light.json.val.rich
   M_PER_CLASS: 4 # Number of versions per clique during a training iteration.
   SCALE: normalize # ['normalize', 'upscale']
+  MIN_LENGTH: 4000 
   MAX_LENGTH: 7600 # Number of frames to consider as context, before downsampling.
   BATCH_SIZE: 8 # Number of versions in batch.
   EPOCHS: 40 # Number of epochs to train.
   LOSS:
-    PROTOTYPICAL:
-      WEIGHT: 1.0
-      N_SUPPORT: 2
     TRIPLET:
       WEIGHT: 1 # Weight of the loss.
       MARGIN: 0.2 # Triplet loss margin
@@ -32,14 +30,6 @@ TRAIN:
       NEGATIVE_MINING: hard # ['hard', 'random', 'semi-hard']        SQUARED_DISTANCE: False # Use squared distance in the loss.
       SQUARED_DISTANCE: False # Use squared distance in the loss.
       NON_ZERO_MEAN: True # If true, the zero losses in the batch are filtered out before averaging.
-    CENTER:
-      WEIGHT: 0.002 # Weight of the loss.
-      NUM_CLS: 80_017 # Number of classes.
-      FEAT_DIM: 512 # Embedding dimension
-      SHARE_BN: True
-    SOFTMAX:
-      LABEL_SMOOTHING: 0.1
-      OUTPUT_DIM: 80_017 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.
   OPTIMIZER: Adam # ['Adam', 'AdamW']
   AUTOMATIC_MIXED_PRECISION: True # Use mixed precision training.
   LR:

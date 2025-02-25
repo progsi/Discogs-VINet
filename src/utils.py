@@ -5,9 +5,9 @@ import yaml
 import torch
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 
-from src.nets.cqtnet import CQTNet
+from src.nets.cqtnet import CQTNet, CQTNetMTL
 from src.nets.coverhunter import CoverHunter
-from src.nets.lyracnet import LyraCNet
+from src.nets.lyracnet import LyraCNet, LyraCNetMTL
 from src.nets.versegnet import VerSegNet
 from src.losses import init_loss, WeightedMultiloss, WeightedMultilossInductive, INDUCTIVE_KEY
 from src.lr_schedulers import (
@@ -46,7 +46,7 @@ def build_model(config: dict, device: str, mode: str) -> Tuple[torch.nn.Module, 
     loss_config_inductive = config["TRAIN"].get("LOSS_INDUCTIVE")
     
     if loss_config_inductive:
-        raise NotImplementedError("Inductive loss not implemented yet.")
+        assert config["MODEL"]["ARCHITECTURE"].endswith("-mtl"), "Inductive loss only works with inductive models"
     
     if mode == "train":
         loss_func = init_loss(loss_config, loss_config_inductive)
@@ -68,6 +68,17 @@ def build_model(config: dict, device: str, mode: str) -> Tuple[torch.nn.Module, 
             neck=config["MODEL"]["NECK"],
             loss_config=loss_config
         ).to(device)
+    elif config["MODEL"]["ARCHITECTURE"].upper() == "CQTNET-MTL":
+        model = CQTNetMTL(
+            ch_in=config["MODEL"]["CONV_CHANNEL"],
+            embed_dim=config["MODEL"]["EMBEDDING_SIZE"],
+            norm=config["MODEL"]["NORMALIZATION"],
+            pool=config["MODEL"]["POOLING"],
+            l2_normalize=config["MODEL"]["L2_NORMALIZE"],
+            neck=config["MODEL"]["NECK"],
+            loss_config=loss_config,
+            loss_config_inductive=loss_config_inductive
+        ).to(device)
     elif config["MODEL"]["ARCHITECTURE"].upper() == "COVERHUNTER":
         model = CoverHunter(
             input_dim=config["MODEL"]["FREQUENCY_BINS"],
@@ -86,6 +97,16 @@ def build_model(config: dict, device: str, mode: str) -> Tuple[torch.nn.Module, 
             widen_factor=config["MODEL"]["WIDEN_FACTOR"],
             neck="bnneck",
             loss_config=loss_config
+            ).to(device)
+    elif config["MODEL"]["ARCHITECTURE"].upper() == "LYRACNET-MTL":
+        model = LyraCNetMTL(
+            depth=config["MODEL"]["DEPTH"],
+            embed_dim=config["MODEL"]["EMBEDDING_SIZE"],
+            num_blocks=config["MODEL"]["NUM_BLOCKS"],
+            widen_factor=config["MODEL"]["WIDEN_FACTOR"],
+            neck="bnneck",
+            loss_config=loss_config,
+            loss_config_inductive=loss_config_inductive
             ).to(device)
     elif config["MODEL"]["ARCHITECTURE"].upper() == "VERSEGNET":
         model = VerSegNet(

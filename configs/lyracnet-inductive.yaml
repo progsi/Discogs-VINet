@@ -1,7 +1,7 @@
 MODEL :
   NAME: LyraCNet-Inductive
   # Model
-  ARCHITECTURE: lyracnet
+  ARCHITECTURE: lyracnet-mtl
   EMBEDDING_SIZE: 1024 
   DEPTH: 28 
   NUM_BLOCKS: 4
