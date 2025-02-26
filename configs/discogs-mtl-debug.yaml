@@ -1,5 +1,5 @@
 MODEL :
-  NAME: Discogs-Inductive
+  NAME: Discogs-MTL-Debug
   ARCHITECTURE: cqtnet-mtl
   CONV_CHANNEL: 40
   EMBEDDING_SIZE: 512
@@ -61,7 +61,7 @@ TRAIN:
         NUM_BLOCKS: 1 # hidden dimension 
         OUTPUT_DIM: 1 #
   OPTIMIZER: Adam # ['Adam', 'AdamW']
-  AUTOMATIC_MIXED_PRECISION: False # Use mixed precision training.
+  AUTOMATIC_MIXED_PRECISION: True # Use mixed precision training.
   LR:
     SCHEDULE: EXPONENTIAL-MIN_LR # ['NONE', 'STEP', 'MULTISTEP', 'EXPONENTIAL' 'EXPONENTIAL-MIN_LR', 'COSINE, LIN-WARMUP-PCWS'].
     LR: 0.001 

@@ -196,9 +196,9 @@ class RichTrainDataset(TrainDataset):
 
         assert loss_config_inductive is not None, "Inductive transfer requires loss_config_inductive"
         
-        self.genre_label_strategy = loss_config_inductive[GENRES_KEY.upper()]["STRATEGY"]
-        self.style_label_strategy = loss_config_inductive[STYLES_KEY.upper()]["STRATEGY"]
-        self.year_label_strategy = "fill_random"
+        self.genre_label_strategy = self.__get_strategy(loss_config_inductive, GENRES_KEY.upper())
+        self.style_label_strategy = self.__get_strategy(loss_config_inductive, STYLES_KEY.upper())
+        self.year_label_strategy = self.__get_strategy(loss_config_inductive, YEAR_KEY.upper())
         self.country_label = None
 
         self.GENRES_KEY = GENRES_KEY
@@ -231,6 +231,14 @@ class RichTrainDataset(TrainDataset):
         if self.year_label_strategy:
             labels[self.YEAR_KEY] = self.get_year(version, self.YEAR_KEY, self.year_label_strategy)
         return feature, labels
+    
+    @staticmethod
+    def __get_strategy(loss_config, key):
+        config = loss_config.get(key.upper())
+        if config:
+            return config["STRATEGY"]
+        else: 
+            return None
         
     def _init_genre_style_dict(self, key: str) -> Dict[str, int]:
         values = {}
