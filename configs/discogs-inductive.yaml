@@ -40,7 +40,7 @@ TRAIN:
         LOSS_NAME: MULTILABEL
         STRATEGY: multilabel # ["random", "first", "multilabel", "smooth"]
         LABEL_SMOOTHING: 0.1
-        PROJECTION: linear # ["linear", "affine", "mlp"]
+        PROJECTION: mlp # ["linear", "affine", "mlp"]
         AFTER_BLOCK: 1 # after which encoder block to apply the inductive loss
         NUM_BLOCKS: 2 # hidden dimension 
         OUTPUT_DIM: 13 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.  OPTIMIZER: Adam # ['Adam', 'AdamW']
@@ -48,12 +48,20 @@ TRAIN:
         LOSS_NAME: MULTILABEL
         STRATEGY: multilabel # ["random", "first", "multilabel", "smooth"]
         LABEL_SMOOTHING: 0.1
-        PROJECTION: linear # ["linear", "affine", "mlp"]
+        PROJECTION: mlp # ["linear", "affine", "mlp"]
         AFTER_BLOCK: 2 # after which encoder block to apply the inductive loss
         NUM_BLOCKS: 1 # hidden dimension 
         OUTPUT_DIM: 284 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.  OPTIMIZER: Adam # ['Adam', 'AdamW']
+    RELEASED:
+        WEIGHT: 0.000001
+        LOSS_NAME: MSE
+        STRATEGY: fill_random # ["random", "first", "multilabel", "smooth"]
+        PROJECTION: mlp # ["linear", "affine", "mlp"]
+        AFTER_BLOCK: 3 # after which encoder block to apply the inductive loss
+        NUM_BLOCKS: 1 # hidden dimension 
+        OUTPUT_DIM: 1 #
   OPTIMIZER: Adam # ['Adam', 'AdamW']
-  AUTOMATIC_MIXED_PRECISION: True # Use mixed precision training.
+  AUTOMATIC_MIXED_PRECISION: False # Use mixed precision training.
   LR:
     SCHEDULE: EXPONENTIAL-MIN_LR # ['NONE', 'STEP', 'MULTISTEP', 'EXPONENTIAL' 'EXPONENTIAL-MIN_LR', 'COSINE, LIN-WARMUP-PCWS'].
     LR: 0.001 

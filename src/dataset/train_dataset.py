@@ -176,8 +176,8 @@ class RichTrainDataset(TrainDataset):
         transform (torch.nn.Transform, optional): . Defaults to None.
         genre_label_strategy (str, optional): . Defaults to "random". Other options: "first", "multilabel", "smooth".
         style_label_strategy (str, optional): . Defaults to None. Other options: "first", "multilabel", "smooth".
-        country_label_strategy (str, optional): . Defaults to None.
-        released_label_strategy (str, optional): . Defaults to None.
+        country_label (str, optional): . Defaults to None.
+        year_label (str, optional): . Defaults to None.
     """
     def __init__(
         self,
@@ -198,9 +198,9 @@ class RichTrainDataset(TrainDataset):
         
         self.genre_label_strategy = loss_config_inductive[GENRES_KEY.upper()]["STRATEGY"]
         self.style_label_strategy = loss_config_inductive[STYLES_KEY.upper()]["STRATEGY"]
-        self.country_label_strategy = None
-        self.year_label_strategy = None
-        
+        self.year_label_strategy = "fill_random"
+        self.country_label = None
+
         self.GENRES_KEY = GENRES_KEY
         self.STYLES_KEY = STYLES_KEY
         self.COUNTRY_KEY = COUNTRY_KEY
@@ -211,7 +211,7 @@ class RichTrainDataset(TrainDataset):
             self.cls_to_ids[self.GENRES_KEY] = self._init_genre_style_dict(self.GENRES_KEY)
         if self.style_label_strategy:
             self.cls_to_ids[self.STYLES_KEY] = self._init_genre_style_dict(self.STYLES_KEY)
-        if self.country_label_strategy:
+        if self.country_label:
             self.cls_to_ids[self.COUNTRY_KEY] = self._init_country_dict(self.COUNTRY_KEY)
     
     def __getitem__(self, index) -> Tuple[torch.Tensor, list]:
@@ -226,11 +226,10 @@ class RichTrainDataset(TrainDataset):
             labels[self.GENRES_KEY] = self.get_cls_ids(version, self.GENRES_KEY, self.genre_label_strategy)
         if self.style_label_strategy:
             labels[self.STYLES_KEY] = self.get_cls_ids(version, self.STYLES_KEY, self.style_label_strategy)
-        if self.country_label_strategy:
+        if self.country_label:
             labels[self.COUNTRY_KEY] = self.cls_to_ids[self.COUNTRY_KEY][version[self.COUNTRY_KEY]]
         if self.year_label_strategy:
-            labels[self.YEAR_KEY] = version[self.YEAR_KEY]
-        
+            labels[self.YEAR_KEY] = self.get_year(version, self.YEAR_KEY, self.year_label_strategy)
         return feature, labels
         
     def _init_genre_style_dict(self, key: str) -> Dict[str, int]:
@@ -295,6 +294,19 @@ class RichTrainDataset(TrainDataset):
         else:
             raise ValueError(f"Unknown strategy: {strategy}")
     
+    def get_year(self, version: Dict[str, any], key: str, strategy: str) -> torch.Tensor:
+        
+        year = version[key] 
+        if len(year) > 1:
+            year = int(year)
+        else:
+            if strategy == "fill_random":
+                # select random year if not available
+                year = random.randint(1950, 2022)    
+            elif strategy == "fill_mean":
+                year = 1995
+        return torch.tensor(float(year)).unsqueeze(0)      
+
     @staticmethod
     def collate_fn(items) -> Tuple[torch.Tensor, torch.Tensor]:
         """Collate function for the dataset. 

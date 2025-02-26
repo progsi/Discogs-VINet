@@ -12,6 +12,7 @@ SOFTMAX_LOSS = 'softmax'
 PROTOTYPICAL_LOSS = 'prototypical'
 FOCAL_LOSS = 'focal'
 MULTILABEL = 'multilabel'
+MSE_LOSS = 'mse'
 
 def init_single_loss(loss_name: str, loss_params: dict) -> Type[nn.Module]:
     """Initialize a single loss function.
@@ -38,6 +39,8 @@ def init_single_loss(loss_name: str, loss_params: dict) -> Type[nn.Module]:
         return PrototypicalLoss(n_support=loss_params['N_SUPPORT'])
     elif loss_name == MULTILABEL.upper():
         return nn.BCEWithLogitsLoss()
+    elif loss_name == MSE_LOSS.upper():
+        return nn.MSELoss()
 
 def init_loss(loss_config: dict, loss_config_inductive: dict = None) -> Type[nn.Module]:
     """Initialize a loss function, either single loss or weihted Multiloss.
