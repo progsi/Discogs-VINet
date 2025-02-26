@@ -197,7 +197,7 @@ class RichTrainDataset(TrainDataset):
         assert loss_config_inductive is not None, "Inductive transfer requires loss_config_inductive"
         
         self.genre_label_strategy = loss_config_inductive[GENRES_KEY.upper()]["STRATEGY"]
-        self.style_label_strategy = None
+        self.style_label_strategy = loss_config_inductive[STYLES_KEY.upper()]["STRATEGY"]
         self.country_label_strategy = None
         self.year_label_strategy = None
         
@@ -239,6 +239,8 @@ class RichTrainDataset(TrainDataset):
         for version in self.versions:
             vs = version[key]
             for v in vs:
+                if isinstance(v, list):
+                    v = ': '.join(v)
                 if not v in values:
                     values[v] = cls_id
                     cls_id += 1
@@ -267,6 +269,9 @@ class RichTrainDataset(TrainDataset):
             torch.Tensor: label id(s)
         """
         items = version[key]
+        if key == STYLES_KEY:
+            items = [': '.join(item) for item in items]
+        
         if strategy == "random":
             item = random.choice(items)
             return torch.tensor(self.cls_to_ids[key][item])
@@ -277,7 +282,12 @@ class RichTrainDataset(TrainDataset):
             # Multi-label encoding
             items = torch.tensor([self.cls_to_ids[key][item] for item in items])
             n = len(self.cls_to_ids[key])
-            ids = torch.sum(F.one_hot(items, n), axis=0).float()
+            
+            if len(items) > 0:
+                ids = torch.sum(F.one_hot(items, n), axis=0).float()
+            else:
+                ids = torch.zeros(n)
+            
             # Smoothing
             if strategy == "smooth":
                 ids = ids / ids.sum(dim=1, keepdim=True)

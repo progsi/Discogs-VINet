@@ -51,10 +51,6 @@ def build_model(config: dict, device: str, mode: str) -> Tuple[torch.nn.Module, 
     if mode == "train":
         loss_func = init_loss(loss_config, loss_config_inductive)
     
-        if config["MODEL"]["ARCHITECTURE"].upper() != "LYRACNET":
-            assert not (
-                (isinstance(loss_func, WeightedMultiloss) or isinstance(loss_func, WeightedMultilossInductive))and 
-                config["MODEL"]["NECK"] != "bnneck"), "WeightedMultiloss only works with BNNeck"
     else:
         loss_func = None
         

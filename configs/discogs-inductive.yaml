@@ -44,6 +44,14 @@ TRAIN:
         AFTER_BLOCK: 1 # after which encoder block to apply the inductive loss
         NUM_BLOCKS: 2 # hidden dimension 
         OUTPUT_DIM: 13 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.  OPTIMIZER: Adam # ['Adam', 'AdamW']
+    RELEASE_STYLES: # must be key like in Discogs dataset
+        LOSS_NAME: MULTILABEL
+        STRATEGY: multilabel # ["random", "first", "multilabel", "smooth"]
+        LABEL_SMOOTHING: 0.1
+        PROJECTION: linear # ["linear", "affine", "mlp"]
+        AFTER_BLOCK: 2 # after which encoder block to apply the inductive loss
+        NUM_BLOCKS: 1 # hidden dimension 
+        OUTPUT_DIM: 284 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.  OPTIMIZER: Adam # ['Adam', 'AdamW']
   OPTIMIZER: Adam # ['Adam', 'AdamW']
   AUTOMATIC_MIXED_PRECISION: True # Use mixed precision training.
   LR:

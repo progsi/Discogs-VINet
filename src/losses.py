@@ -39,7 +39,7 @@ def init_single_loss(loss_name: str, loss_params: dict) -> Type[nn.Module]:
     elif loss_name == MULTILABEL.upper():
         return nn.BCEWithLogitsLoss()
 
-def init_loss(loss_config: dict, loss_config_inductive: dict) -> Type[nn.Module]:
+def init_loss(loss_config: dict, loss_config_inductive: dict = None) -> Type[nn.Module]:
     """Initialize a loss function, either single loss or weihted Multiloss.
     Args:
         loss_config (dict): dictionary based on config file
@@ -48,7 +48,7 @@ def init_loss(loss_config: dict, loss_config_inductive: dict) -> Type[nn.Module]
         Type[nn.Module]: initialized loss class
     """
     assert len(loss_config.keys()) >= 1, f"Minimum one loss is required!"
-    if len(loss_config.keys()) == 1:
+    if len(loss_config.keys()) == 1 and not loss_config_inductive:
         loss_name, loss_params = list(loss_config.items())[0]
         return init_single_loss(loss_name, loss_params)
     else:

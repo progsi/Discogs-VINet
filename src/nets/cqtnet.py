@@ -273,8 +273,16 @@ class CQTNetMTL(CQTNet):
         loss_config_inductive: Dict[str,Union[int,str]] = None,
     ):
         super().__init__(ch_in, embed_dim, norm, pool, l2_normalize, neck, loss_config)
+
+        self.loss_config = loss_config
         self.loss_config_inductive = loss_config_inductive
         
+        if len(self.loss_config) > 1:
+            assert neck == "bnneck", "BNNeck required for multi-loss!"
+            self.out_key = None # key for the output loss
+        else:
+            self.out_key = list(self.loss_config.keys())[0]
+
         self.mapping = {}
         self.necks = nn.ModuleDict()
         for loss_name, config in self.loss_config_inductive.items():
@@ -310,9 +318,11 @@ class CQTNetMTL(CQTNet):
         x = torch.flatten(x, 1)
         x, neck_dict = self.neck(x)
 
+        # merge dicts
         if neck_dict is not None:
-            for key, value in neck_dict.items():
-                loss_dict[key] = value
+            loss_dict = loss_dict | neck_dict   
+        else:
+            loss_dict[self.out_key] = x
 
         # L2 normalization with 0 norm handling
         if self.l2_normalize:
