@@ -18,6 +18,7 @@ TRAIN:
   VALIDATION_CLIQUES: /data/discogs/Discogs-VI-YT-20240701-light.json.val.rich
   M_PER_CLASS: 4 # Number of versions per clique during a training iteration.
   SCALE: normalize # ['normalize', 'upscale']
+  MIN_LENGTH: 4000
   MAX_LENGTH: 7600 # Number of frames to consider as context, before downsampling.
   BATCH_SIZE: 8 # Number of versions in batch.
   EPOCHS: 200 # Number of epochs to train.

@@ -309,7 +309,7 @@ class CQTNetMTL(CQTNet):
         
         for i, block in enumerate(self.blocks):
             x = block(x)
-            if i in self.mapping:
+            if self.training and i in self.mapping:
                 for loss_name in self.mapping[i]:
                     out, _ = self.necks[loss_name](x)
                     loss_dict[loss_name] = out
