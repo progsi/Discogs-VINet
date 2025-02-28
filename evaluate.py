@@ -103,7 +103,6 @@ def evaluate(
         embeddings,
         labels,
         similarity_search=similarity_search,
-        noise_works=noise_works,
         chunk_size=chunk_size,
         device=device,
         genres=genres
@@ -285,7 +284,3 @@ if __name__ == "__main__":
 
     #############
     print("Done!")
-
-# TODO: Test regaring Padding: Batch Size 1 vs. Batch Size 216
-# TODO: Test regarding GPU Usage: 
-#       - chunk_size=None vs. chunk_size=1_024 vs. chunk_size=10_240

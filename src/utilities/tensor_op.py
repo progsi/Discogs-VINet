@@ -2,6 +2,23 @@ from typing import Optional, Tuple
 
 import torch
 
+def pairwise_similarity_search(x: torch.Tensor, y: torch.tensor = None, similarity_search: str = "MIPS"):
+    """_summary_
+    Args:
+        x (torch.Tensor): 
+        y (torch.Tensor): 
+        similarity_search (str, optional): . Defaults to "MIPS".
+    """
+    if y is None:
+        y = x
+    if similarity_search == "MIPS":
+        S = pairwise_dot_product(x, y)  # (B, N) 
+    elif similarity_search == "MCSS":
+        S = pairwise_cosine_similarity(x, y)  # (B, N)
+    else:
+        # Use low precision for faster calculations
+        S = -1 * pairwise_distance_matrix(x, y, precision="low")  # (B, N)
+    return S
 
 def l2_normalize(x: torch.Tensor, eps: float = 1e-12, precision: str = "high"):
     """L2 normalize the input tensor. In the case that the norm is small,,

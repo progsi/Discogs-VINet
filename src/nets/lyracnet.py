@@ -135,7 +135,51 @@ class LyraCNet(nn.Module):
         
         return out_tensor, out_dict
 
+    
+class InductiveNeck(nn.Module):
+    def __init__(self, 
+                 input_dim: int, 
+                 output_dim: int, 
+                 num_blocks: int, 
+                 norm: torch.nn.Module,
+                 pool: torch.nn.Module,
+                 projection: str):
+        super().__init__()
+        
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+        self.projection = projection
+        self.norm = norm
+        self.pool = pool
+        
+        self.num_blocks = num_blocks
+        self.blocks = self.init_blocks()
+        
+        self.neck = nn.Sequential(
+            self.blocks,
+            pool,
+            nn.Flatten(),
+            SimpleNeck(self.blocks[-1].ch_out, output_dim, projection)
+        )
+    
+    def init_blocks(self):
+        """Initialize blocks following the logic of CQTNet.
+        Returns:
+            torch.nn.Sequential: blocks
+        """
+        
+        blocks = nn.ModuleList()
+        
+        ch_in = self.input_dim
+        ch_out = self.input_dim
+        pool = nn.Identity()
 
+        # TODO implement
+        
+    def forward(self, x):
+        return self.neck(x)
+    
+    
 class LyraCNetMTL(LyraCNet):
         def __init__(self, 
                  depth: int, 
