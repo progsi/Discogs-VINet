@@ -172,3 +172,4 @@ src/nets/versegnet.py
 src/nets/msa_tf.py
 configs/versegnet.yaml
 playground.ipynb
+results

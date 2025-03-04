@@ -391,7 +391,7 @@ def calculate_metrics(
     # storing the evaluation metrics
     metrics = {}
     if chunk_size:
-        if S:
+        if S is not None:
             X = S
         else: 
             X = embeddings
