@@ -1,11 +1,11 @@
 MODEL :
-  NAME: Discogs-MTL-Styles
-  ARCHITECTURE: cqtnet-mtl
+  NAME: Discogs-VINet
+  ARCHITECTURE: cqtnet
   CONV_CHANNEL: 40
   EMBEDDING_SIZE: 512
   NORMALIZATION: bn # ['bn', 'in', 'ibn']
   POOLING: adaptive_max # ['adaptive_max', 'gem', 'softpool']
-  NECK: linear # ['none', 'linear', 'affine', 'mlp', 'bnneck']
+  NECK: linear # ['none', 'linear', 'affine', 'mlp']
   L2_NORMALIZE: True # L2 normalize the embeddings.
   SIMILARITY_SEARCH: MIPS # ['MCSS', 'NNS', 'MIPS'] If L2_NORMALIZE is True, use 'MIPS' for faster search.
   DOWNSAMPLE_FACTOR: 20 # Downsampling factor.
@@ -14,37 +14,20 @@ MODEL :
 TRAIN:
   # Train and Validation, and Augmentation directories
   FEATURES_DIR: /data/audio/cqt/
-  TRAIN_CLIQUES: /data/discogs/Discogs-VI-YT-20240701-light.json.train.rich
-  VALIDATION_CLIQUES: /data/discogs/Discogs-VI-YT-20240701-light.json.val.rich
-  M_PER_CLASS: 4 # Number of versions per clique during a training iteration.
+  TRAIN_CLIQUES: /data/discogs/Discogs-VI-YT-20240701-light.json.train
+  VALIDATION_CLIQUES: /data/discogs/Discogs-VI-YT-20240701-light.json.val
+  M_PER_CLASS: 2 # Number of versions per clique during a training iteration.
   SCALE: normalize # ['normalize', 'upscale']
-  MIN_LENGTH: 4000
   MAX_LENGTH: 7600 # Number of frames to consider as context, before downsampling.
-  BATCH_SIZE: 216 # Number of versions in batch.
-  EPOCHS: 200 # Number of epochs to train.
-  AUGMENTATION:
-      F: 27
-      NUM_FREQ_MASKS: 1
-      NUM_TIME_MASKS: 1
-      REPLACE_WITH_ZERO: false
-      T: 100
+  BATCH_SIZE: 96 # Number of versions in batch.
+  EPOCHS: 50 # Number of epochs to train.
   LOSS:
     TRIPLET:
-      WEIGHT: 1 # Weight of the loss.
       MARGIN: 0.3 # Triplet loss margin
-      POSITIVE_MINING: hard # ['hard', 'random', 'easy']
-      NEGATIVE_MINING: hard # ['hard', 'random', 'semi-hard']        SQUARED_DISTANCE: False # Use squared distance in the loss.
+      POSITIVE_MINING: random # ['hard', 'random', 'easy']
+      NEGATIVE_MINING: hard # ['hard', 'random', 'semi-hard']
       SQUARED_DISTANCE: False # Use squared distance in the loss.
       NON_ZERO_MEAN: True # If true, the zero losses in the batch are filtered out before averaging.
-  LOSS_INDUCTIVE:
-    RELEASE_STYLES: # must be key like in Discogs dataset
-      LOSS_NAME: MULTILABEL
-      STRATEGY: multilabel # ["random", "first", "multilabel", "smooth"]
-      LABEL_SMOOTHING: 0.1
-      PROJECTION: mlp # ["linear", "affine", "mlp"]
-      AFTER_BLOCK: 2 # after which encoder block to apply the inductive loss
-      NUM_BLOCKS: 2 # hidden dimension 
-      OUTPUT_DIM: 500 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.  OPTIMIZER: Adam # ['Adam', 'AdamW']
   OPTIMIZER: Adam # ['Adam', 'AdamW']
   AUTOMATIC_MIXED_PRECISION: True # Use mixed precision training.
   LR:

@@ -1,4 +1,4 @@
-from typing import Dict, Union
+from typing import Dict, Union, List
 
 import torch
 import torch.nn as nn
@@ -77,16 +77,16 @@ class LyraCNet(nn.Module):
         self.num_blocks = num_blocks
         self.embed_dim = embed_dim
         
-        nChannels = [16]
+        self.nChannels = [16]
         for i in range(num_blocks):
-            nChannels.append(16 * widen_factor * (2 ** i))
+            self.nChannels.append(16 * widen_factor * (2 ** i))
         
         assert((depth - 4) % 6 == 0) # TODO: check why the constants?
         n = (depth - 4) // 6
         
         block = BasicBlock
         # 1st conv before any network block
-        self.conv1 = nn.Conv2d(1, nChannels[0], kernel_size=3, stride=1,
+        self.conv1 = nn.Conv2d(1, self.nChannels[0], kernel_size=3, stride=1,
                                padding=1, bias=False)
         
         # Create network blocks dynamically
@@ -94,10 +94,10 @@ class LyraCNet(nn.Module):
         for i in range(num_blocks):
             activate_before = i == 0 # only for first block
             # stride = 1 if i == 0 else 2
-            self.blocks.append(NetworkBlock(n, nChannels[i], nChannels[i + 1], block, 2, dropout, activate_before))
+            self.blocks.append(NetworkBlock(n, self.nChannels[i], self.nChannels[i + 1], block, 2, dropout, activate_before))
         
         # global average pooling and classifier
-        self.bn1 = nn.BatchNorm2d(nChannels[-1], momentum=0.001)
+        self.bn1 = nn.BatchNorm2d(self.nChannels[-1], momentum=0.001)
         self.relu = nn.LeakyReLU(negative_slope=0.1, inplace=True)
         self.drop = nn.Dropout(dense_dropout)        
         self.pooling = GeM() # flattening necessary?
@@ -107,7 +107,7 @@ class LyraCNet(nn.Module):
         else:
             self.neck = BNNeck(self.embed_dim, embed_dim, loss_config)
                     
-        self.nChannels = nChannels[-1]
+        self.nChannels = self.nChannels[-1]
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -129,7 +129,7 @@ class LyraCNet(nn.Module):
         x = self.bn1(x)
         x = self.relu(x) 
         x = self.pooling(x)
-        x = x.view(-1, self.nChannels)
+        x = x.view(-1, self.nChannels[-1])
         
         out_tensor, out_dict = self.neck(x)
         
@@ -138,20 +138,21 @@ class LyraCNet(nn.Module):
     
 class InductiveNeck(nn.Module):
     def __init__(self, 
-                 input_dim: int, 
+                 channels: List[int], 
                  output_dim: int, 
                  num_blocks: int, 
                  norm: torch.nn.Module,
                  pool: torch.nn.Module,
-                 projection: str):
+                 projection: str,
+                 dropout: float = 0.0):
         super().__init__()
         
-        self.input_dim = input_dim
+        self.nChannels = channels
         self.output_dim = output_dim
         self.projection = projection
         self.norm = norm
         self.pool = pool
-        
+        self.dropout = dropout
         self.num_blocks = num_blocks
         self.blocks = self.init_blocks()
         
@@ -169,42 +170,80 @@ class InductiveNeck(nn.Module):
         """
         
         blocks = nn.ModuleList()
-        
-        ch_in = self.input_dim
-        ch_out = self.input_dim
-        pool = nn.Identity()
 
-        # TODO implement
+        for i in range(1, self.num_blocks + 1):
+            
+            # TODO: put these blocks appropriately
+            self.blocks.append(NetworkBlock(4, self.nChannels[i], self.nChannels[i + 1], BasicBlock, 2, self.dropout, False))
+            
+        return nn.Sequential(*blocks)
         
     def forward(self, x):
         return self.neck(x)
     
     
 class LyraCNetMTL(LyraCNet):
-        def __init__(self, 
-                 depth: int, 
-                 embed_dim: int, 
-                 num_blocks: int, 
-                 widen_factor: int, 
-                 neck: str = "linear",
-                 loss_config: Dict[str,Union[int,str]] = None,
-                 dropout: float = 0.0, 
-                 dense_dropout: float = 0.0,
-                 loss_config_inductive: Dict[str,Union[int,str]] = None,
-                 ):
-            super(LyraCNet, self).__init__(depth, embed_dim, num_blocks, 
-                                           widen_factor, neck, loss_config, 
-                                           dropout, dense_dropout, loss_config_inductive)
+    def __init__(self, 
+                depth: int, 
+                embed_dim: int, 
+                num_blocks: int, 
+                widen_factor: int, 
+                neck: str = "linear",
+                loss_config: Dict[str,Union[int,str]] = None,
+                dropout: float = 0.0, 
+                dense_dropout: float = 0.0,
+                loss_config_inductive: Dict[str,Union[int,str]] = None,
+                ):
+        super().__init__(depth, embed_dim, num_blocks, widen_factor, neck, loss_config, 
+                        dropout, dense_dropout)
             
-            self.inductive_heads = nn.ModuleDict()
-            for label, config in loss_config_inductive.items():
-                self.inductive_heads[label] = nn.Linear(self.nChannels[-1], config["OUTPUT_DIM"])
+        self.loss_config = loss_config
+        self.loss_config_inductive = loss_config_inductive
+        
+        if len(self.loss_config) > 1:
+            assert neck == "bnneck", "BNNeck required for multi-loss!"
+            self.out_key = None # key for the output loss
+        else:
+            self.out_key = list(self.loss_config.keys())[0]
+
+        self.mapping = {}
+        self.necks = nn.ModuleDict()
+        for loss_name, config in self.loss_config_inductive.items():
+            assert loss_name not in loss_config, "Inductive loss cannot be in the same config!"
             
-        def forward(self, x):
-            
-            out_tensor, out_dict = super().forward(x)
-            
-            for label, head in self.inductive_heads.items():
-                out_dict[label] = head(x)
-            
-            return out_tensor, out_dict
+            after_block = config["AFTER_BLOCK"]
+            if not after_block in self.mapping:
+                self.mapping[after_block] = [loss_name]
+            else:
+                self.mapping[after_block].append(loss_name)
+
+            self.necks[loss_name] = InductiveNeck(
+                channels=self.nChannels[after_block:],
+                output_dim=config["OUTPUT_DIM"],
+                num_blocks=config["NUM_BLOCKS"],
+                norm=self.norm,
+                pool=self.pool,
+                projection=config["PROJECTION"])
+                
+    def forward(self, x):
+        
+        loss_dict = {}
+        
+        for i, block in enumerate(self.blocks):
+            x = block(x)
+            if self.training and i in self.mapping:
+                for loss_name in self.mapping[i]:
+                    out, _ = self.necks[loss_name](x)
+                    loss_dict[loss_name] = out
+        
+        x = self.pool(x)
+        x = torch.flatten(x, 1)
+        x, neck_dict = self.neck(x)
+
+        # merge dicts
+        if neck_dict is not None:
+            loss_dict = loss_dict | neck_dict   
+        else:
+            loss_dict[self.out_key] = x
+
+        return x, loss_dict

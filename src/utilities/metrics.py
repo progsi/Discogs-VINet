@@ -404,8 +404,8 @@ def calculate_metrics(
         metrics = compute_all(S, C, device, genres)
     
     # printing the evaluation metrics
-    for scheme, metrics in metrics.items():
+    for scheme, submetrics in metrics.items():
         print(f"Scheme: {scheme}")
-        for metric, value in metrics.items():
-            print(f"{metric:>5}: {value}")
+        for submetric, value in submetrics.items():
+            print(f"{submetric:>5}: {value}")
     return metrics

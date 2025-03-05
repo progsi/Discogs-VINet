@@ -210,7 +210,9 @@ if __name__ == "__main__":
         args.test_cliques,
         args.features_dir,
         mean_downsample_factor=config["MODEL"]["DOWNSAMPLE_FACTOR"],
-        cross_genre=args.cross_genre)
+        cross_genre=args.cross_genre,
+        scale=config["TRAIN"]["SCALE"],
+        min_length=config["TRAIN"]["MIN_LENGTH"])
     
     eval_loader = DataLoader(
             eval_dataset,
@@ -279,8 +281,9 @@ if __name__ == "__main__":
     with open(eval_path, "w") as f:
         writer = csv.writer(f)
         writer.writerow(["metric", "value"])
-        for metric, value in metrics.items():
-            writer.writerow([metric, value])
+        for scheme, scheme_metrics in metrics.items():
+            for submetric, value in scheme_metrics.items():
+                writer.writerow([f"{scheme}_{submetric}", value])
 
     #############
     print("Done!")

@@ -21,7 +21,7 @@ TRAIN:
   MIN_LENGTH: 4000
   MAX_LENGTH: 7600 # Number of frames to consider as context, before downsampling.
   BATCH_SIZE: 8 # Number of versions in batch.
-  EPOCHS: 200 # Number of epochs to train.
+  EPOCHS: 50 # Number of epochs to train.
   AUGMENTATION:
       F: 27
       NUM_FREQ_MASKS: 1
