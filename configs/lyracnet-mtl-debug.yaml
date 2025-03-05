@@ -54,25 +54,26 @@ TRAIN:
         STRATEGY: multilabel # ["random", "first", "multilabel", "smooth"]
         LABEL_SMOOTHING: 0.1
         PROJECTION: mlp # ["linear", "affine", "mlp"]
-        AFTER_BLOCK: 4 # after which encoder block to apply the inductive loss
-        NUM_BLOCKS: 2 # hidden dimension 
+        AFTER_BLOCK: 2 # after which encoder block to apply the inductive loss
+        NUM_BLOCKS: 1 # hidden dimension 
         OUTPUT_DIM: 13 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.  OPTIMIZER: Adam # ['Adam', 'AdamW']
       RELEASE_STYLES: # must be key like in Discogs dataset
         LOSS_NAME: MULTILABEL
         STRATEGY: multilabel # ["random", "first", "multilabel", "smooth"]
         LABEL_SMOOTHING: 0.1
         PROJECTION: mlp # ["linear", "affine", "mlp"]
-        AFTER_BLOCK: 4 # after which encoder block to apply the inductive loss
-        NUM_BLOCKS: 2 # hidden dimension 
-        OUTPUT_DIM: 500 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.  OPTIMIZER: Adam # ['Adam', 'AdamW']
+        AFTER_BLOCK: 2 # after which encoder block to apply the inductive loss
+        NUM_BLOCKS: 1 # hidden dimension 
+        OUTPUT_DIM: 284 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.  OPTIMIZER: Adam # ['Adam', 'AdamW']
       RELEASED:
         WEIGHT: 0.000001
         LOSS_NAME: MSE
         STRATEGY: fill_random # ["random", "first", "multilabel", "smooth"]
         PROJECTION: mlp # ["linear", "affine", "mlp"]
-        AFTER_BLOCK: 4 # after which encoder block to apply the inductive loss
-        NUM_BLOCKS: 2 # hidden dimension 
-        OUTPUT_DIM: 1 #    OPTIMIZER: Adam # ['Adam', 'AdamW']
+        AFTER_BLOCK: 2 # after which encoder block to apply the inductive loss
+        NUM_BLOCKS: 1 # hidden dimension 
+        OUTPUT_DIM: 1 #    
+    OPTIMIZER: Adam # ['Adam', 'AdamW']
     WEIGHT_DECAY: 0.00001 
     AUTOMATIC_MIXED_PRECISION: True # Use mixed precision training.
     LR: # see https://github.com/Liu-Feng-deeplearning/CoverHunter/blob/main/egs/covers80/config/hparams.yaml

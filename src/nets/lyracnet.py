@@ -106,8 +106,9 @@ class LyraCNet(nn.Module):
             self.neck = SimpleNeck(self.embed_dim, embed_dim, neck)
         else:
             self.neck = BNNeck(self.embed_dim, embed_dim, loss_config)
-                    
-        self.nChannels = self.nChannels[-1]
+        
+        # NOTE: removed  
+        # self.nChannels = self.nChannels[-1]
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -141,7 +142,6 @@ class InductiveNeck(nn.Module):
                  channels: List[int], 
                  output_dim: int, 
                  num_blocks: int, 
-                 norm: torch.nn.Module,
                  pool: torch.nn.Module,
                  projection: str,
                  dropout: float = 0.0):
@@ -150,7 +150,6 @@ class InductiveNeck(nn.Module):
         self.nChannels = channels
         self.output_dim = output_dim
         self.projection = projection
-        self.norm = norm
         self.pool = pool
         self.dropout = dropout
         self.num_blocks = num_blocks
@@ -160,7 +159,7 @@ class InductiveNeck(nn.Module):
             self.blocks,
             pool,
             nn.Flatten(),
-            SimpleNeck(self.blocks[-1].ch_out, output_dim, projection)
+            SimpleNeck(self.blocks[-1].layer[-1].conv2.out_channels, output_dim, projection)
         )
     
     def init_blocks(self):
@@ -174,7 +173,7 @@ class InductiveNeck(nn.Module):
         for i in range(1, self.num_blocks + 1):
             
             # TODO: put these blocks appropriately
-            self.blocks.append(NetworkBlock(4, self.nChannels[i], self.nChannels[i + 1], BasicBlock, 2, self.dropout, False))
+            blocks.append(NetworkBlock(4, self.nChannels[i], self.nChannels[i] * 2, BasicBlock, 2, self.dropout, False))
             
         return nn.Sequential(*blocks)
         
@@ -221,29 +220,28 @@ class LyraCNetMTL(LyraCNet):
                 channels=self.nChannels[after_block:],
                 output_dim=config["OUTPUT_DIM"],
                 num_blocks=config["NUM_BLOCKS"],
-                norm=self.norm,
-                pool=self.pool,
+                pool=GeM(),
                 projection=config["PROJECTION"])
                 
     def forward(self, x):
         
-        loss_dict = {}
+        mtl_dict = {}
+        
+        x = self.conv1(x)
         
         for i, block in enumerate(self.blocks):
             x = block(x)
             if self.training and i in self.mapping:
                 for loss_name in self.mapping[i]:
                     out, _ = self.necks[loss_name](x)
-                    loss_dict[loss_name] = out
+                    mtl_dict[loss_name] = out
+
+        x = self.bn1(x)
+        x = self.relu(x) 
+        x = self.pooling(x)
+        x = x.view(-1, self.nChannels[-1])
         
-        x = self.pool(x)
-        x = torch.flatten(x, 1)
-        x, neck_dict = self.neck(x)
-
-        # merge dicts
-        if neck_dict is not None:
-            loss_dict = loss_dict | neck_dict   
-        else:
-            loss_dict[self.out_key] = x
-
-        return x, loss_dict
+        out_tensor, out_dict = self.neck(x)
+        out_dict = out_dict | mtl_dict 
+        
+        return out_tensor, out_dict
