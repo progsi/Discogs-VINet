@@ -123,7 +123,10 @@ class TestDataset(BaseDataset):
         else:
             for clique_id, versions in self.cliques.items():
                 for version_id in versions.keys():
-                    self.items.append((clique_id, version_id))            
+                    self.items.append((clique_id, version_id))      
+        
+        if self.cross_genre:
+            self.idx_to_genre = {idx: genre for genre, idx in self.genre_to_idx.items()}
 
     def __getitem__(
         self, idx, encode_version=False

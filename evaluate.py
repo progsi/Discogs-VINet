@@ -24,7 +24,8 @@ def evaluate(
     noise_works: bool,
     amp: bool,
     device: torch.device,
-    genres: torch.Tensor = None,
+    genres_multihot: torch.Tensor = None,
+    genre_idx_to_label: dict = None,
 ) -> dict:
     """Evaluate the model by simulating the retrieval task. Compute the embeddings
     of all versions and calculate the pairwise distances. Calculate the mean average
@@ -48,8 +49,10 @@ def evaluate(
         Flag to indicate if Automatic Mixed Precision should be used.
     device : torch.device
         Device to use for inference and metric calculation.
-    genres : torch.Tensor
+    genres_multihot : torch.Tensor
         Tensor with multi-hot genres.
+    genre_idx_to_label :
+        Dictionary mapping genre indices to genre labels.
 
     Returns:
     --------
@@ -105,7 +108,8 @@ def evaluate(
         similarity_search=similarity_search,
         chunk_size=chunk_size,
         device=device,
-        genres=genres
+        genres_multihot=genres_multihot,
+        genre_idx_to_label=genre_idx_to_label
     )
     print(f"Calculation time: {format_time(time.monotonic() - t0)}")
 
@@ -258,9 +262,10 @@ if __name__ == "__main__":
         args.similarity_search = config["MODEL"]["SIMILARITY_SEARCH"]
         
     if args.cross_genre:
-        genres = eval_dataset.get_all_genres_multihot()
+        genres_multihot = eval_dataset.get_all_genres_multihot()
+        genre_idx_to_label = eval_dataset.idx_to_genre
     else:
-        genres = None
+        genres_multihot = None
 
     print("Evaluating...")
     t0 = time.monotonic()
@@ -272,7 +277,8 @@ if __name__ == "__main__":
         noise_works=eval_dataset.datacos,
         amp=config["TRAIN"]["AUTOMATIC_MIXED_PRECISION"],
         device=device,
-        genres=genres,
+        genres_multihot=genres_multihot,
+        genre_idx_to_label=genre_idx_to_label
     )
     print(f"Total time: {format_time(time.monotonic() - t0)}")
 

@@ -58,7 +58,8 @@ def compute_chunkwise(X: torch.Tensor,
                       chunk_size: int, 
                       device: str = "cpu", 
                       similarity_search: str = None,
-                      genres: torch.Tensor = None) -> Dict[str, float]:
+                      genres_multihot: torch.Tensor = None,
+                      genre_idx_to_label: Dict[int,str] = None) -> Dict[str, float]:
     """Compute the evaluation metrics in chunks to avoid memory issues.
     Args:
         X (torch.Tensor): either similarity matrix or embeddings
@@ -80,18 +81,19 @@ def compute_chunkwise(X: torch.Tensor,
     has_positives = torch.sum(C, 1) > 0
     X, C = X[has_positives], C[has_positives]
     
-    if genres is not None:
-        eq_genre, sim_genre, other_genre = cross_genre_masks(genres)
-        eq_genre = eq_genre[has_positives] 
-        sim_genre = sim_genre[has_positives]
-        other_genre = other_genre[has_positives]
+    # init cross genre metrics
+    if genres_multihot is not None:
+        genres_multihot = genres_multihot[has_positives]
+        masks = cross_genre_masks(genres_multihot)
         
-        TR_eq, MAP_eq = torch.tensor([]), torch.tensor([])
-        nQs_eq, nRel_eq = 0, 0
-        TR_sim, MAP_sim = torch.tensor([]), torch.tensor([])
-        nQs_sim, nRel_sim = 0, 0
-        TR_oth, MAP_oth = torch.tensor([]), torch.tensor([])
-        nQs_oth, nRel_oth = 0, 0
+        if genre_idx_to_label is not None:
+            masks = masks | genre_wise_masks(genre_idx_to_label, genres_multihot)
+        
+        metrics_genre = {}
+        for name, _ in masks.items():
+            metrics_genre[name] = {
+                "TR": torch.tensor([]), "MAP": torch.tensor([]),
+                "nQueries": 0, "nRelevant": 0}
 
     # Iterate over the chunks
     for i, (x, c) in enumerate(zip(X.split(chunk_size), C.split(chunk_size))):
@@ -113,45 +115,20 @@ def compute_chunkwise(X: torch.Tensor,
         MAP = torch.cat((MAP, ap))
         
         # NOTE: sry, this function is blowing up, I will refactor it later
-        if genres is not None:
+        if genres_multihot is not None:
             # get chunks of same genres
-            eq = eq_genre[i:i+chunk_size]
-            eq_s, eq_c = mask_tensors(s, c, eq)
-            eq_has_positives = torch.sum(eq_c, axis=1) > 0
-            eq_s, eq_c = eq_s[eq_has_positives], eq_c[eq_has_positives]
-            if len(eq_s) > 0:
-                ap_eq, tr_eq = compute_partial(eq_s, eq_c, ranking, k, device)
-                TR_eq = torch.cat((TR_eq, tr_eq))
-                MAP_eq = torch.cat((MAP_eq, ap_eq))
-                nqs_eq, nrel_eq = eq_c.shape[0], torch.sum(eq_c).item()
-                nQs_eq += nqs_eq
-                nRel_eq += nrel_eq
-
-            # get chunk of similar genres
-            similar = sim_genre[i:i+chunk_size]
-            sim_s, sim_c = mask_tensors(s, c, similar)
-            sim_has_positives = torch.sum(sim_c, axis=1) > 0
-            sim_s, sim_c = sim_s[sim_has_positives], sim_c[sim_has_positives]
-            if len(sim_s) > 0:
-                ap_sim, tr_sim = compute_partial(sim_s, sim_c, ranking, k, device)
-                TR_sim = torch.cat((TR_sim, tr_sim))
-                MAP_sim = torch.cat((MAP_sim, ap_sim))
-                nqs_sim, nrel_sim = sim_c.shape[0], torch.sum(sim_c).item()
-                nQs_sim += nqs_sim 
-                nRel_sim += nrel_sim
-            
-            # get chunk of other genres
-            other = other_genre[i:i+chunk_size]
-            oth_s, oth_c = mask_tensors(s, c, other)
-            oth_has_positives = torch.sum(oth_c, axis=1) > 0
-            oth_s, oth_c = oth_s[oth_has_positives], oth_c[oth_has_positives]
-            if len(oth_s) > 0:
-                ap_oth, tr_oth = compute_partial(oth_s, oth_c, ranking, k, device)
-                TR_oth = torch.cat((TR_oth, tr_oth))
-                MAP_oth = torch.cat((MAP_oth, ap_oth))
-                nqs_oth, nrel_oth = oth_c.shape[0], torch.sum(oth_c).item()
-                nQs_oth += nqs_oth 
-                nRel_oth += nrel_oth
+            for name, cross_mask in masks.items():
+                _cross_mask = cross_mask[i:i+chunk_size]
+                _s, _c = mask_tensors(s, c, _cross_mask)
+                _has_positives = torch.sum(_c, axis=1) > 0
+                _s, _c = _s[_has_positives], _c[_has_positives]
+                if len(_s) > 0:
+                    ap, top_rank = compute_partial(_s, _c, ranking, k, device)
+                    metrics_genre[name]["TR"] = torch.cat((metrics_genre[name]["TR"], top_rank))
+                    metrics_genre[name]["MAP"] = torch.cat((metrics_genre[name]["MAP"], ap))
+                    nqs, nrel = _c.shape[0], torch.sum(_c).item()
+                    metrics_genre[name]["nQueries"] += nqs
+                    metrics_genre[name]["nRelevant"] += nrel
 
     # computing the final evaluation metrics
     MR1 = torch.nanmean(TR).float().item() # before: TR.mean().item()
@@ -168,30 +145,17 @@ def compute_chunkwise(X: torch.Tensor,
         "avgRelPerQ": round(torch.mean(torch.sum(C, 1)).item(), 2)
     }
     
-    if genres is not None:
-        results["Cross-Genre"] = {
-            # same genre
-            "MAP-Same": round(MAP_eq.mean().item(), 3),
-            "MRR-Same": round(torch.nanmean((1/TR_eq).float()).item(), 3),
-            "MR1-Same": round(torch.nanmean(TR_eq).float().item(), 2),
-            "nQueries-Same": round(nQs_eq),
-            "nRelevant-Same": round(nRel_eq),
-            "avgRelPerQ-Same": round(nRel_eq / nQs_eq, 2),
-            # similar genre
-            "MAP-Similar": round(MAP_sim.mean().item(), 3),
-            "MRR-Similar": round(torch.nanmean((1/TR_sim).float()).item(), 3),
-            "MR1-Similar": round(torch.nanmean(TR_sim).float().item(), 2),
-            "nQueries-Similar": round(nQs_sim),
-            "nRelevant-Similar": round(nRel_sim),
-            "avgRelPerQ-Similar": round(nRel_sim / nQs_sim, 2),
-            # cross genre
-            "MAP-Cross": round(MAP_oth.mean().item(), 3),
-            "MRR-Cross": round(torch.nanmean((1/TR_oth).float()).item(), 3),
-            "MR1-Cross": round(torch.nanmean(TR_oth).float().item(), 2),
-            "nQueries-Cross": round(nQs_oth),
-            "nRelevant-Cross": round(nRel_oth),
-            "avgRelPerQ-Cross": round(nRel_oth / nQs_oth, 2)
-        }
+    if genres_multihot is not None:
+        results["Genre"] = {}
+        for group, metrics in metrics_genre.items():
+            group = group.replace(" ", "_")
+            nQs, nRel = metrics["nQueries"], metrics["nRelevant"]
+            results["Genre"][group + "-" + "MAP"] = round(metrics["MAP"].mean().item(), 3)
+            results["Genre"][group + "-" + "MRR"] = round(torch.nanmean((1/metrics["TR"]).float()).item(), 3)
+            results["Genre"][group + "-" + "MR1"] = round(torch.nanmean(metrics["TR"]).float().item(), 2)
+            results["Genre"][group + "-" + "nQueries"] = round(nQs)
+            results["Genre"][group + "-" + "nRelevant"] = round(nRel)
+            results["Genre"][group + "-" + "avgRelPerQ"] = round(nRel / nQs, 2)
     return results
     
 def MR1(preds: torch.Tensor, target: torch.Tensor, device: str) -> torch.Tensor:
@@ -220,6 +184,14 @@ def compute_all(S: torch.Tensor,
                 device: str = "cpu",
                 genre: torch.Tensor = None) -> Dict[str, float]:
     
+    results = compute_metrics_all(S, C, device)
+
+    if genre is not None:
+        genre_results = cross_genre_metrics_all(S, C, genre, device)
+        results = results | genre_results
+    return results
+
+def compute_metrics_all(S: torch.Tensor, C: torch.Tensor, device: str = "cpu") -> Dict[str, float]:
     S, C = S.to(device), C.to(device)
     indexes = torch.arange(S.size(0), device=device).unsqueeze(1).expand_as(S)
 
@@ -227,7 +199,7 @@ def compute_all(S: torch.Tensor,
     mRR = MRR(S, C, indexes)
     hr10 = HR10(S, C, indexes)
     mr1 = MR1(S, C, device)
-    results = {
+    return {
         "MAP": round(mAP.item(), 3),
         "MRR": round(mRR.item(), 3),
         "MR1": round(mr1.item(), 3),
@@ -236,11 +208,6 @@ def compute_all(S: torch.Tensor,
         "nRelevant": round(torch.sum(C).item()),
         "avgRelPerQ": round(torch.mean(torch.sum(C, 1)).item(), 2)
     }
-
-    if genre is not None:
-        genre_results = cross_genre_metrics_all(S, C, genre, device)
-        results = results | genre_results
-    return results
     
 def mask_tensors(S: torch.Tensor, 
                  C: torch.Tensor, 
@@ -257,48 +224,56 @@ def mask_tensors(S: torch.Tensor,
     s[~mask], c[~mask] = float("-inf"), 0
     return s, c
     
-def cross_genre_masks(genres: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+def cross_genre_masks(genres_multihot: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Generates genre masks.
     Args:
-        genres (torch.Tensor): one-hot-encoded genre tensor
+        genres_multihot (torch.Tensor): one-hot-encoded genre tensor
     Returns:
         Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: same, similar, different genre masks
     """
-    mask_same = torch.eq(genres.unsqueeze(1), genres.unsqueeze(0)).all(dim=-1)
-    mask_similar =  torch.matmul(genres.float(), genres.t().float()) > 0
+    mask_same = torch.eq(genres_multihot.unsqueeze(1), genres_multihot.unsqueeze(0)).all(dim=-1)
+    mask_similar =  torch.matmul(genres_multihot.float(), genres_multihot.t().float()) > 0
     mask_cross = (~mask_same & ~mask_similar)
-    return mask_same, mask_similar, mask_cross
+    return {"In-Genre": mask_same, "Partial-Genre": mask_similar, "Cross-Genre": mask_cross}
 
+def genre_wise_masks(genre_idx_to_label: Dict[int,str], genres_multihot: torch.Tensor) -> Dict[str, torch.Tensor]:
+    """Generates genre masks.
+    Args:
+        genres_multihot (torch.Tensor): one-hot-encoded genre tensor
+    Returns:
+        Dict[str, torch.Tensor]: genre masks
+    """
+    genre_masks = {}
+    for genre, label in genre_idx_to_label.items():
+        mask = genres_multihot[:, genre] == 1
+        genre_masks[label] = mask.unsqueeze(1).repeat(1, genres_multihot.size(0))
+    return genre_masks
 
 def cross_genre_metrics_all(S: torch.Tensor, 
                         C: torch.Tensor,
-                        genres: torch.Tensor,
+                        genres_multihot: torch.Tensor,
+                        genre_idx_to_label: Dict[int,str] = None,
                         device: str = "cpu") -> Dict[str, float]:
     """Do the cross-genre evaluation.
     Args:
         S (torch.Tensor): similarities
         C (torch.Tensor): clique memberships
         chunk_size (int): 
-        genres (torch.Tensor): genres multi-hot encoded
+        genres_multihot (torch.Tensor): genres multi-hot encoded
+        genre_idx_to_label: (Dict[int,str]): mapping from genre index to label
         device (str, optional): Defaults to "cpu".
     Returns:
         Dict[str, float]: metrics
     """
-    mask_same, mask_similar, mask_cross = cross_genre_masks(genres)
-    negatives = (C != 1)
+    results = {}
+    masks_cross = cross_genre_masks(genres_multihot)
     
-    S_same , C_same = mask_tensors(S, C, mask_same)
-    S_similar , C_similar = mask_tensors(S, C, mask_similar)
-    S_cross , C_cross = mask_tensors(S, C, mask_cross)
+    for name, mask in masks_cross.items():
+        S, C = mask_tensors(S, C, mask)
+        metrics = compute_metrics_all(S, C, device)
+        results[name] = metrics
     
-    merics_same = compute_all(S_same, C_same, device)
-    metrics_partly = compute_all(S_similar , C_similar, device)
-    metrics_none = compute_all(S_cross , C_cross, device)
-    return {
-        "Same-Genre": merics_same,
-        "Similar-Genre": metrics_partly,
-        "Cross-Genre": metrics_none
-    }
+    return results
 
 def calculate_metrics(
     embeddings: torch.Tensor,
@@ -306,7 +281,8 @@ def calculate_metrics(
     similarity_search: str = "MIPS",
     chunk_size: int = 256,
     device: str = "cpu",
-    genres: torch.Tensor = None,
+    genres_multihot: torch.Tensor = None,
+    genre_idx_to_label: Dict[int, str] = None,
 ) -> Dict[str, float]:
     """Perform similarity search for a set of embeddings and calculate the following
     metrics using the ground truth labels.
@@ -335,6 +311,10 @@ def calculate_metrics(
         The size of the chunks to use during the evaluation.
     device: str = "cpu"
         The device to use for the calculations.
+    genres_multihot: 
+        Multi-hot encoded genre labels per version
+    genre_idx_to_label
+        Mapping from genre index to names
     Returns:
     --------
     metrics: dict
@@ -392,9 +372,10 @@ def calculate_metrics(
                                                chunk_size, 
                                                device, 
                                                similarity_search if not precompute else None,
-                                               genres) 
+                                               genres_multihot,
+                                               genre_idx_to_label) 
     else:
-        metrics = compute_all(S, C, device, genres)
+        metrics = compute_all(S, C, device, genres_multihot, genre_idx_to_label)
     
     # printing the evaluation metrics
     for scheme, submetrics in metrics.items():
