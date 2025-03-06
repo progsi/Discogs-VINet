@@ -69,7 +69,10 @@ def train_epoch(
 
 
     if scheduler is not None:
-        scheduler.step()
+        if scheduler.__class__.__name__ == "ReduceLROnPlateau":
+            scheduler.step(loss)
+        else:
+            scheduler.step()
         lr = scheduler.optimizer.param_groups[0]["lr"]
     else:
         lr = optimizer.param_groups[0]["lr"]
@@ -290,12 +293,13 @@ if __name__ == "__main__":
                 device=device,
             )
             t_eval = time.monotonic() - t0
+            metrics_overall = metrics["Overall"]
             print(
-                f"MAP: {metrics['MAP']:.3f}, MR1: {metrics['MR1']:.2f} - {format_time(t_eval)}"
+                f"MAP: {metrics_overall['MAP']:.3f}, MR1: {metrics_overall['MR1']:.2f} - {format_time(t_eval)}"
             )
 
-            if metrics["MAP"] >= best_mAP:
-                best_mAP = metrics["MAP"]
+            if metrics_overall["MAP"] >= best_mAP:
+                best_mAP = metrics_overall["MAP"]
                 save_model(
                     best_save_dir,
                     config=config,

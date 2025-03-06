@@ -3,12 +3,12 @@ from typing import Tuple
 
 import yaml
 import torch
-from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
+from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts, ReduceLROnPlateau
 
 from src.nets.cqtnet import CQTNet, CQTNetMTL
 from src.nets.coverhunter import CoverHunter
 from src.nets.lyracnet import LyraCNet, LyraCNetMTL
-from src.losses import init_loss, WeightedMultiloss, WeightedMultilossInductive, INDUCTIVE_KEY
+from src.losses import init_loss
 from src.lr_schedulers import (
     CosineAnnealingWarmRestartsWithWarmup,
     WarmupPiecewiseConstantScheduler,
@@ -210,6 +210,11 @@ def load_model(config: dict, device: str, mode="train"):
             scheduler = WarmupPiecewiseConstantScheduler(
                 optimizer,
                 eta_min=config["TRAIN"]["LR"]["LR"],
+                **lr_params,
+            )
+        elif config["TRAIN"]["LR"]["SCHEDULE"].upper() == "REDUCE-ON-PLATEAU":
+            scheduler = ReduceLROnPlateau(
+                optimizer,
                 **lr_params,
             )
         else:

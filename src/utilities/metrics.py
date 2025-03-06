@@ -82,9 +82,9 @@ def compute_chunkwise(X: torch.Tensor,
     
     if genres is not None:
         eq_genre, sim_genre, other_genre = cross_genre_masks(genres)
-        eq_genre = eq_genre[has_positives] | (C == 0)
-        sim_genre = sim_genre[has_positives] | (C == 0)
-        other_genre = other_genre[has_positives] | (C == 0)
+        eq_genre = eq_genre[has_positives] 
+        sim_genre = sim_genre[has_positives]
+        other_genre = other_genre[has_positives]
         
         TR_eq, MAP_eq = torch.tensor([]), torch.tensor([])
         nQs_eq, nRel_eq = 0, 0
@@ -287,15 +287,8 @@ def cross_genre_metrics_all(S: torch.Tensor,
     mask_same, mask_similar, mask_cross = cross_genre_masks(genres)
     negatives = (C != 1)
     
-    mask_same = mask_same | negatives
     S_same , C_same = mask_tensors(S, C, mask_same)
-    
-    # Versions with at least one genre in common
-    mask_similar = mask_similar | negatives
     S_similar , C_similar = mask_tensors(S, C, mask_similar)
-    
-    # Versions with no genre in common
-    mask_cross = (~mask_same & ~mask_similar) | negatives
     S_cross , C_cross = mask_tensors(S, C, mask_cross)
     
     merics_same = compute_all(S_same, C_same, device)

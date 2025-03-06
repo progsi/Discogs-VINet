@@ -1,5 +1,5 @@
 MODEL :
-  NAME: Discogs-VINet
+  NAME: Discogs-MIREXNet-Aug-HardNeg
   ARCHITECTURE: cqtnet
   CONV_CHANNEL: 40
   EMBEDDING_SIZE: 512
@@ -20,7 +20,7 @@ TRAIN:
   SCALE: normalize # ['normalize', 'upscale']
   MIN_LENGTH: 4000
   MAX_LENGTH: 7600 # Number of frames to consider as context, before downsampling.
-  BATCH_SIZE: 96 # Number of versions in batch.
+  BATCH_SIZE: 216 # Number of versions in batch.
   EPOCHS: 50 # Number of epochs to train.
   AUGMENTATION:
     F: 27
