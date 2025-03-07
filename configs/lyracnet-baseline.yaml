@@ -1,32 +1,34 @@
 MODEL :
-  NAME: Discogs-BNNeck-Inductive
-  ARCHITECTURE: cqtnet-mtl
-  CONV_CHANNEL: 40
-  EMBEDDING_SIZE: 512
-  NORMALIZATION: bn # ['bn', 'in', 'ibn']
-  POOLING: adaptive_max # ['adaptive_max', 'gem', 'softpool']
-  NECK: bnneck # ['none', 'linear', 'affine', 'mlp', 'bnneck']
-  L2_NORMALIZE: True # L2 normalize the embeddings.
-  SIMILARITY_SEARCH: MIPS # ['MCSS', 'NNS', 'MIPS'] If L2_NORMALIZE is True, use 'MIPS' for faster search.
-  DOWNSAMPLE_FACTOR: 20 # Downsampling factor.
+  NAME: LyraCNet-Baseline
+  # Model
+  ARCHITECTURE: lyracnet
+  EMBEDDING_SIZE: 1024 
+  DEPTH: 28 
+  NUM_BLOCKS: 4
+  WIDEN_FACTOR: 8
+  FREQUENCY_BINS: 84
+  SAMPLE_RATE: 22050
+  DOWNSAMPLE_FACTOR: 15 # might try out 20?
+  L2_NORMALIZE: False # L2 normalize the embeddings.
+  SIMILARITY_SEARCH: MCSS # ['MCSS', 'NNS', 'MIPS'] If L2_NORMALIZE is True, use 'MIPS' for faster search.
   CHECKPOINT_DIR: logs/checkpoints/
-
 TRAIN:
   # Train and Validation, and Augmentation directories
   FEATURES_DIR: /data/audio/cqt/
-  TRAIN_CLIQUES: /data/discogs/Discogs-VI-YT-20240701-light.json.train.rich
-  VALIDATION_CLIQUES: /data/discogs/Discogs-VI-YT-20240701-light.json.val.rich
+  TRAIN_CLIQUES: /data/discogs/Discogs-VI-YT-20240701-light.json.train
+  VALIDATION_CLIQUES: /data/discogs/Discogs-VI-YT-20240701-light.json.val
   M_PER_CLASS: 4 # Number of versions per clique during a training iteration.
   SCALE: normalize # ['normalize', 'upscale']
-  MAX_LENGTH: 7600 # Number of frames to consider as context, before downsampling.
+  MAX_LENGTH: 7750 # Number of frames to consider as context, before downsampling.
+  MIN_LENGTH: 4430 
   BATCH_SIZE: 216 # Number of versions in batch.
   EPOCHS: 200 # Number of epochs to train.
   AUGMENTATION:
-      F: 27
-      NUM_FREQ_MASKS: 1
-      NUM_TIME_MASKS: 1
-      REPLACE_WITH_ZERO: false
-      T: 100
+    F: 27
+    NUM_FREQ_MASKS: 1
+    NUM_TIME_MASKS: 1
+    REPLACE_WITH_ZERO: false
+    T: 100
   LOSS:
     PROTOTYPICAL:
       WEIGHT: 1.0
@@ -39,27 +41,24 @@ TRAIN:
       SQUARED_DISTANCE: False # Use squared distance in the loss.
       NON_ZERO_MEAN: True # If true, the zero losses in the batch are filtered out before averaging.
     CENTER:
-      WEIGHT: 0.002 # Weight of the loss.
+      WEIGHT: 0.001 # Weight of the loss.
       NUM_CLS: 80_017 # Number of classes.
-      FEAT_DIM: 512 # Embedding dimension
+      FEAT_DIM: 1024 # Embedding dimension
       SHARE_BN: True
-    SOFTMAX:
-      LABEL_SMOOTHING: 0.1
+    FOCAL:
+      WEIGHT: 1.0 # Weight of the loss.
+      GAMMA: 2.0 # Focal loss gamma.
       OUTPUT_DIM: 80_017 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.
-  LOSS_INDUCTIVE:
-    SOFTMAX:
-      AFTER_BLOCK: 2  
-      INDUCTIVE_CLS: RELEASE_GENRES
-      LABEL_SMOOTHING: 0.1
-      OUTPUT_DIM: 13 # No. of classes of Discogs-Training set instead of 30k in CoverHunter paper.
   OPTIMIZER: Adam # ['Adam', 'AdamW']
+  WEIGHT_DECAY: 0.00001 
   AUTOMATIC_MIXED_PRECISION: True # Use mixed precision training.
   LR:
-    SCHEDULE: EXPONENTIAL-MIN_LR # ['NONE', 'STEP', 'MULTISTEP', 'EXPONENTIAL' 'EXPONENTIAL-MIN_LR', 'COSINE, LIN-WARMUP-PCWS'].
+    SCHEDULE: REDUCE-ON-PLATEAU # ['NONE', 'STEP', 'MULTISTEP', 'EXPONENTIAL' 'EXPONENTIAL-MIN_LR', 'COSINE, LIN-WARMUP-PCWS'].
     LR: 0.001 
     PARAMS:
-      ETA_MIN: 0.0001 # from 
-      GAMMA: 0.9975
+      MODE: min # must be min, we measure the loss
+      PATIENCE: 10 # epochs 
+      FACTOR: 0.1
   CUDA_DETERMINISTIC: False # Set to True for deterministic training.
   CUDA_BENCHMARK: False # Set to True for benchmarking.
   CLIQUE_USAGE_RATIO: 1.0 # Fraction of training data to use. Useful for debugging. 1.0 to use 100% of data.

@@ -266,6 +266,7 @@ if __name__ == "__main__":
         genre_idx_to_label = eval_dataset.idx_to_genre
     else:
         genres_multihot = None
+        genre_idx_to_label = None
 
     print("Evaluating...")
     t0 = time.monotonic()
