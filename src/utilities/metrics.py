@@ -232,6 +232,7 @@ def cross_genre_masks(genres_multihot: torch.Tensor) -> Tuple[torch.Tensor, torc
         Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: same, similar, different genre masks
     """
     mask_match = torch.eq(genres_multihot.unsqueeze(1), genres_multihot.unsqueeze(0)).all(dim=-1)
+    mask_match &= genres_multihot.sum(dim=-1).unsqueeze(1) > 0
     mask_min1 =  torch.matmul(genres_multihot.float(), genres_multihot.t().float()) > 0
     mask_overlap = mask_min1 & ~mask_match
     mask_mismatch = ~mask_min1
