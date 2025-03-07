@@ -231,10 +231,16 @@ def cross_genre_masks(genres_multihot: torch.Tensor) -> Tuple[torch.Tensor, torc
     Returns:
         Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: same, similar, different genre masks
     """
-    mask_same = torch.eq(genres_multihot.unsqueeze(1), genres_multihot.unsqueeze(0)).all(dim=-1)
-    mask_similar =  torch.matmul(genres_multihot.float(), genres_multihot.t().float()) > 0
-    mask_cross = (~mask_same & ~mask_similar)
-    return {"In-Genre": mask_same, "Partial-Genre": mask_similar, "Cross-Genre": mask_cross}
+    mask_match = torch.eq(genres_multihot.unsqueeze(1), genres_multihot.unsqueeze(0)).all(dim=-1)
+    mask_min1 =  torch.matmul(genres_multihot.float(), genres_multihot.t().float()) > 0
+    mask_overlap = mask_min1 & ~mask_match
+    mask_mismatch = ~mask_min1
+    return {
+        "Genre-Match": mask_match, 
+        "Genre-Min1": mask_min1, 
+        "Genre-Overlap": mask_overlap, 
+        "Genre-Mismatch": mask_mismatch
+        }
 
 def genre_wise_masks(genre_idx_to_label: Dict[int,str], genres_multihot: torch.Tensor) -> Dict[str, torch.Tensor]:
     """Generates genre masks.

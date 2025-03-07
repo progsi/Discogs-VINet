@@ -198,11 +198,13 @@ class InductiveNeck(nn.Module):
         self.num_blocks = num_blocks
         self.blocks = self.init_blocks()
         
+        dim = self.blocks[-1].ch_out if self.num_blocks > 0 else self.input_dim
+        
         self.neck = nn.Sequential(
             self.blocks,
             pool,
             nn.Flatten(),
-            SimpleNeck(self.blocks[-1].ch_out, output_dim, projection)
+            SimpleNeck(dim, output_dim, projection)
         )
     
     def init_blocks(self):
@@ -288,20 +290,29 @@ class CQTNetMTL(CQTNet):
         for loss_name, config in self.loss_config_inductive.items():
             assert loss_name not in loss_config, "Inductive loss cannot be in the same config!"
             
-            after_block = config["AFTER_BLOCK"]
+            after_block = config.get("AFTER_BLOCK")
+            
             if not after_block in self.mapping:
                 self.mapping[after_block] = [loss_name]
             else:
                 self.mapping[after_block].append(loss_name)
+                
             # TODO: does this work though?
-            block_output_dim = 16 * ch_in if config["AFTER_BLOCK"] == len(self.blocks) else self.blocks[after_block].ch_out
-            self.necks[loss_name] = InductiveNeck(
-                input_dim=block_output_dim,
-                output_dim=config["OUTPUT_DIM"],
-                num_blocks=config["NUM_BLOCKS"],
-                norm=self.norm,
-                pool=self.pool,
-                projection=config["PROJECTION"])
+            block_output_dim = 16 * ch_in if config["AFTER_BLOCK"] in [len(self.blocks), -1] else self.blocks[after_block].ch_out
+
+            if config["NUM_BLOCKS"] > 0:
+                self.necks[loss_name] = InductiveNeck(
+                    input_dim=block_output_dim,
+                    output_dim=config["OUTPUT_DIM"],
+                    num_blocks=config["NUM_BLOCKS"],
+                    norm=self.norm,
+                    pool=self.pool,
+                    projection=config["PROJECTION"])
+            else:
+                self.necks[loss_name] = SimpleNeck(
+                    input_dim=block_output_dim,
+                    embed_dim=config["OUTPUT_DIM"],
+                    projection=config["PROJECTION"])
 
     def forward(self, x):
         
@@ -316,6 +327,12 @@ class CQTNetMTL(CQTNet):
         
         x = self.pool(x)
         x = torch.flatten(x, 1)
+        
+        if -1 in self.mapping:
+            for loss_name in self.mapping[-1]:
+                out, _ = self.necks[loss_name](x)
+                loss_dict[loss_name] = out
+
         x, neck_dict = self.neck(x)
 
         # merge dicts

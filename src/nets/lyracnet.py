@@ -215,14 +215,21 @@ class LyraCNetMTL(LyraCNet):
                 self.mapping[after_block] = [loss_name]
             else:
                 self.mapping[after_block].append(loss_name)
+            
+            if config["NUM_BLOCKS"] > 0:
+                self.necks[loss_name] = InductiveNeck(
+                    channels=self.nChannels[after_block:],
+                    output_dim=config["OUTPUT_DIM"],
+                    num_blocks=config["NUM_BLOCKS"],
+                    pool=GeM(),
+                    projection=config["PROJECTION"])
+            else:
+                block_output_dim = self.nChannels[after_block + 1] if after_block != -1 else self.nChannels[-1]
+                self.necks[loss_name] = SimpleNeck(
+                    input_dim=block_output_dim,
+                    embed_dim=config["OUTPUT_DIM"],
+                    projection=config["PROJECTION"])
 
-            self.necks[loss_name] = InductiveNeck(
-                channels=self.nChannels[after_block:],
-                output_dim=config["OUTPUT_DIM"],
-                num_blocks=config["NUM_BLOCKS"],
-                pool=GeM(),
-                projection=config["PROJECTION"])
-                
     def forward(self, x):
         
         mtl_dict = {}
@@ -240,6 +247,11 @@ class LyraCNetMTL(LyraCNet):
         x = self.relu(x) 
         x = self.pooling(x)
         x = x.view(-1, self.nChannels[-1])
+        
+        if -1 in self.mapping:
+            for loss_name in self.mapping[-1]:
+                out, _ = self.necks[loss_name](x)
+                mtl_dict[loss_name] = out
         
         out_tensor, out_dict = self.neck(x)
         out_dict = out_dict | mtl_dict 
